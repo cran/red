@@ -9,7 +9,7 @@ map.habitat(longlat, layer, polygon = TRUE, eval = TRUE)
 \arguments{
 \item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
 
-\item{layer}{RasterLayer object representing the distribution of a single habitat.}
+\item{layer}{RasterLayer object representing the presence/absence (1/0) of a single habitat type.}
 
 \item{polygon}{If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.}
 

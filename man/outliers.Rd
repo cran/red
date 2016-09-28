@@ -9,7 +9,7 @@ outliers(longlat, layers)
 \arguments{
 \item{longlat}{Matrix of longitude and latitude (two columns) of species occurrence records.}
 
-\item{layers}{Raster* object as defined by package raster.}
+\item{layers}{Raster* object as defined by package raster. It can be any set of environmental layers thought to allow the identification of environmental outliers.}
 }
 \value{
 No values are returned, two plots are drawn for visual inspection.

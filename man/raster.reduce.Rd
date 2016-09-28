@@ -4,7 +4,7 @@
 \alias{raster.reduce}
 \title{Reduce dimensionality of raster layers.}
 \usage{
-raster.reduce(layers, method = "pca", n = NULL, threshold = NULL)
+raster.reduce(layers, method = "pca", n = NULL, thres = NULL)
 }
 \arguments{
 \item{layers}{Raster* object as defined by package raster.}
@@ -13,7 +13,7 @@ raster.reduce(layers, method = "pca", n = NULL, threshold = NULL)
 
 \item{n}{Number of layers to reduce to.}
 
-\item{threshold}{Value for pairwise Pearson's correlation above which one of the layers (randomly selected) is eliminated.}
+\item{thres}{Value for pairwise Pearson's correlation above which one of the layers (randomly selected) is eliminated.}
 }
 \value{
 A RasterStack object.
@@ -23,6 +23,6 @@ Reduce the number of layers by either performing a PCA on them or by eliminating
 }
 \details{
 Using a large number of explanatory variables in models with few records may lead to overfitting. This function allows to avoid it as much as possible.
-If both n and threshold are given, n has priority. If method is not recognized and layers come from raster.read function, only landcover is reduced by using only the dominating landuse of each cell.
+If both n and thres are given, n has priority. If method is not recognized and layers come from raster.read function, only landcover is reduced by using only the dominating landuse of each cell.
 }
 

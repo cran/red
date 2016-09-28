@@ -23,7 +23,7 @@ Thinning of records with minimum distances either absolute or relative to the sp
 }
 \details{
 Clumped distribution records due to ease of accessibility of sites, emphasis of sampling on certain areas in the past, etc. may bias species distribution models.
-The algorithm used here eliminates records closer than a given threshold to any other record. The choice of records to eliminate is random, so a number of runs are made and the one keeping more of the original records is chosen.
+The algorithm used here eliminates records closer than a given thres to any other record. The choice of records to eliminate is random, so a number of runs are made and the one keeping more of the original records is chosen.
 }
 \examples{
 records <- matrix(sample(100), ncol = 2)

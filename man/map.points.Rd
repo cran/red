@@ -9,7 +9,7 @@ map.points(longlat, layers, eval = TRUE)
 \arguments{
 \item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
 
-\item{layers}{Raster* object as defined by package raster.}
+\item{layers}{Raster* object as defined by package raster. Any raster with the relevant extent and cell size can be used.}
 
 \item{eval}{Build a matrix with EOO and AOO calculated from occurrence records only.}
 }
@@ -20,6 +20,6 @@ One raster file and possibly a matrix with EOO and AOO.
 Mapping of all cells where the species is known to occur.
 }
 \details{
-To be used if either information on the species is very scarce or, on the contrary, complete.
+To be used if either information on the species is very scarce (and it is not possible to model the species distribution) or, on the contrary, complete (and there is no need to model the distribution).
 }
 

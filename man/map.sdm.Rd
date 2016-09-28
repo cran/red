@@ -4,7 +4,7 @@
 \alias{map.sdm}
 \title{Predict species distribution.}
 \usage{
-map.sdm(longlat, layers, bg = NULL, categorical = NULL, threshold = 1,
+map.sdm(longlat, layers, bg = NULL, categorical = NULL, thres = 1,
   polygon = TRUE, eval = TRUE, jack = 0)
 }
 \arguments{
@@ -16,7 +16,7 @@ map.sdm(longlat, layers, bg = NULL, categorical = NULL, threshold = 1,
 
 \item{categorical}{Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data itself.}
 
-\item{threshold}{Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.}
+\item{thres}{Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.}
 
 \item{polygon}{Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Only cells connected to other areas inside the polygon are kept.}
 

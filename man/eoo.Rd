@@ -7,7 +7,7 @@
 eoo(spData)
 }
 \arguments{
-\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object.}
+\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence (1/0) map as a RasterLayer object.}
 }
 \value{
 A single value in km2.

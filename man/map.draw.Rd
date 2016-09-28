@@ -5,7 +5,7 @@
 \title{Map creation.}
 \usage{
 map.draw(longlat = NULL, layer, spName, countries = FALSE, scale = TRUE,
-  legend = FALSE, sites = TRUE, EOO = FALSE, print = FALSE)
+  legend = FALSE, sites = TRUE, mcp = FALSE, print = FALSE)
 }
 \arguments{
 \item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
@@ -22,7 +22,7 @@ map.draw(longlat = NULL, layer, spName, countries = FALSE, scale = TRUE,
 
 \item{sites}{If TRUE the record locations are drawn.}
 
-\item{EOO}{If TRUE the polygon representing the Extent of Occurrence is drawn.}
+\item{mcp}{If TRUE the minimum convex polygon representing the Extent of Occurrence is drawn.}
 
 \item{print}{If TRUE a pdf is saved instead of the output to the console.}
 }
@@ -33,6 +33,6 @@ Creates maps ready to print in pdf or other formats.
 data(data.records)
 data(data.sp)
 par(mfrow = c(1,2))
-map.draw(data.records, layer = data.sp, EOO = TRUE)
+map.draw(data.records, layer = data.sp, mcp = TRUE)
 }
 

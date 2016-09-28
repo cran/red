@@ -7,7 +7,7 @@
 map.easy(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
 }
 \arguments{
-\item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
+\item{longlat}{data.frame of species names, longitude and latitude (three columns) of each occurrence record.}
 
 \item{layers}{Raster* object as defined by package raster. If NULL they are read from data files.}
 

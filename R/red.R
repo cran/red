@@ -1,8 +1,11 @@
 #####RED - IUCN Redlisting Tools
-#####Version 0.1.0 (2016-08-19)
+#####Version 0.1.1 (2016-09-28)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments.
+#####Changed from v0.1.0:
+#####Notation of mcp in function map.draw
+#####clarified a number of points in documentation
 
 #####data origins:
 #####climate -> Hijmans, R.J., Cameron, S.E, Parra, J.L., Jones, P.G. & Jarvis A. (2005) Very high resolution interpolated climate surfaces for global land areas. International Journal of Climatology, 25: 1965-1978.
@@ -31,8 +34,6 @@ library("rJava")
 library("sp")
 library("stats")
 library("utils")
-#' @importFrom BAT contribution
-#' @importFrom dismo maxent
 #' @importFrom geosphere areaPolygon
 #' @import graphics
 #' @importFrom grDevices chull dev.copy dev.off pdf
@@ -51,8 +52,8 @@ library("utils")
 ##detect which layers are categorical by checking if all values are integers and if the max is less than 100 (may fail, just an attempt)
 find.categorical <- function(layers){
   categorical = c()
-  for(l in 1:dim(layers)[3]){
-    lay <- as.matrix(layers[[l]])
+  for(l in 1:(dim(layers)[3])){
+    lay <- raster::as.matrix(layers[[l]])
     lay[is.na(lay)] <- 0
     if(sum(as.integer(lay)) == sum(lay) && max(lay < 100))
       categorical = c(categorical, l)
@@ -92,7 +93,7 @@ rli.calc <- function(spData, tree = NULL, boot = FALSE, runs = 1000){
     }
   } else {                                     ##if weighted by PD or FD
     comm <- matrix(1, nrow = 2, ncol = length(spData))
-    contrib <- contribution(comm, tree, relative = TRUE)[1,]
+    contrib <- BAT::contribution(comm, tree, relative = TRUE)[1,]
     if(!boot){                                 ##if no bootstrap to be made
       return (sum(contrib * spData))
     } else {
@@ -115,11 +116,11 @@ rli.calc <- function(spData, tree = NULL, boot = FALSE, runs = 1000){
 #' @details Please check that you have at least 20Gb free in your disk (and a fast internet connection) to download all files. In the end of the process "only" 3Gb will be left though. This function will:
 #' 1. Check if maxent.jar is available in the dismo package directory.
 #' 2. Create a folder named "gis" in the working directory.
-#' 3. Download global bioclim and elevation files (20) from "http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/bio1-9_30s_bil.zip.
-#' 4. Download landcover files (12) from .
+#' 3. Download global bioclim and elevation files (20) from http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/.
+#' 4. Download landcover files (12) from http://data.earthenv.org/consensus_landcover/without_DISCover/.
 #' 5. Unzip all files and delete the originals.
 #' 6. Create a new layer (1) with the dominant land cover at each cell.
-#' 7. Resample all files (33) to 2x2km (as recommended by IUCN) and 10x10km (for use with widespread species) grid cells.
+#' 7. Resample all files (33) to 2x2km (as required by IUCN) and 10x10km (for use with widespread species) grid cells.
 #' 8. Delete the 1x1km files.
 #' Sit back and enjoy, this should take a while.
 #' @export
@@ -190,8 +191,8 @@ http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.h
   gc()
 
   ##download and process land cover
-  max2 <- stack()
-  max10 <- stack()
+  max2 <- raster::stack()
+  max10 <- raster::stack()
   for(i in 1:12){
     setTxtProgressBar(pb, (i+20))
     download.file(paste("http://data.earthenv.org/consensus_landcover/without_DISCover/Consensus_reduced_class_", i, ".tif", sep=""), destfile = paste("gis/Consensus_reduced_class_", i, ".tif", sep=""), mode = "wb")
@@ -202,8 +203,8 @@ http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.h
     writeRaster(rast10, paste("gis/red_10km_", (i+20), ".tif", sep=""))
     file.remove(paste("gis/Consensus_reduced_class_", i, ".tif", sep=""))
     ##write stack for later use of maxStack
-    max2 <- stack(max2, rast2)
-    max10 <- stack(max10, rast10)
+    max2 <- raster::stack(max2, rast2)
+    max10 <- raster::stack(max10, rast10)
     gc()
   }
   remove(rast, rast2, rast10)
@@ -227,7 +228,7 @@ http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.h
 #' Visual detection of outliers.
 #' @description Draws plots of sites in geographical (latlong) and environmental (2-axis PCA) space.
 #' @param longlat Matrix of longitude and latitude (two columns) of species occurrence records.
-#' @param layers Raster* object as defined by package raster.
+#' @param layers Raster* object as defined by package raster. It can be any set of environmental layers thought to allow the identification of environmental outliers.
 #' @details Erroneous data sources or errors in transcriptions may introduce outliers that can be easily detected by looking at simple graphs of geographical or environmental space.
 #' @return No values are returned, two plots are drawn for visual inspection.
 # @examples data(data.records)
@@ -250,7 +251,7 @@ outliers <- function(longlat, layers){
 #' @param relative If TRUE, represents the proportion of maximum distance between any two records. If FALSE, is in raster units.
 #' @param runs Number of runs
 #' @details Clumped distribution records due to ease of accessibility of sites, emphasis of sampling on certain areas in the past, etc. may bias species distribution models.
-#' The algorithm used here eliminates records closer than a given threshold to any other record. The choice of records to eliminate is random, so a number of runs are made and the one keeping more of the original records is chosen.
+#' The algorithm used here eliminates records closer than a given thres to any other record. The choice of records to eliminate is random, so a number of runs are made and the one keeping more of the original records is chosen.
 #' @return A matrix of longitude and latitude (two columns) of species occurrence records separated by at least the given distance.
 #' @examples records <- matrix(sample(100), ncol = 2)
 #' par(mfrow=c(1,2))
@@ -325,13 +326,13 @@ raster.read <- function(longlat, layers = NULL, ext = 1){
   if(is.null(layers)){          ##if no layers are provided read the ones available
     ##calculate species range and buffer around it
     if((xlen * ylen) < 10){
-      layers <- stack(raster("gis/red_2km_1.tif"))
+      layers <- raster::stack(raster("gis/red_2km_1.tif"))
       for(i in 2:33)
-        layers <- stack(layers, raster(paste("gis/red_2km_", i, ".tif", sep = "")))
+        layers <- raster::stack(layers, raster(paste("gis/red_2km_", i, ".tif", sep = "")))
     } else {
-      layers <- stack(raster("gis/red_10km_1.tif"))
+      layers <- raster::stack(raster("gis/red_10km_1.tif"))
       for(i in 2:33)
-        layers <- stack(layers, raster(paste("gis/red_10km_", i, ".tif", sep = "")))
+        layers <- raster::stack(layers, raster(paste("gis/red_10km_", i, ".tif", sep = "")))
     }
     ##determine longitude limits of species to check if crop and paste are needed around longitude 180 for Pacific species
     if(xmin < -90 && xmax > 90 && sum(longlat[longlat[,1] < 90 && longlat[,1] > -90,]) != 0){
@@ -393,26 +394,26 @@ raster.clean <- function(layers){
 #' @param layers Raster* object as defined by package raster.
 #' @param method Either Principal Components Analysis (pca, default) or Pearson's correlation (cor).
 #' @param n Number of layers to reduce to.
-#' @param threshold Value for pairwise Pearson's correlation above which one of the layers (randomly selected) is eliminated.
+#' @param thres Value for pairwise Pearson's correlation above which one of the layers (randomly selected) is eliminated.
 #' @details Using a large number of explanatory variables in models with few records may lead to overfitting. This function allows to avoid it as much as possible.
-#' If both n and threshold are given, n has priority. If method is not recognized and layers come from raster.read function, only landcover is reduced by using only the dominating landuse of each cell.
+#' If both n and thres are given, n has priority. If method is not recognized and layers come from raster.read function, only landcover is reduced by using only the dominating landuse of each cell.
 #' @return A RasterStack object.
 #' @export
-raster.reduce <- function(layers, method = "pca", n = NULL, threshold = NULL){
+raster.reduce <- function(layers, method = "pca", n = NULL, thres = NULL){
   ##method = "pca, cor", if unrecognized method only reduce landcover but not climate
-  out <- stack()
+  out <- raster::stack()
 
   if(dim(layers)[3] == 33){          ##check if layers are obtained with raster.read
-    out <- stack(layers[[33]])
+    out <- raster::stack(layers[[33]])
     layers = layers[[1:19]]
   }
   if(method == "cor"){                       ##if correlation
     if(is.null(n)){
-      if(is.null(threshold))
-        threshold = 0.7
+      if(is.null(thres))
+        thres = 0.7
       for(i in 1:dim(layers)[3]){                  ##delete layers until none are correlated above threshold
         cor = as.matrix(as.dist(layerStats(layers, 'pearson', na.rm = TRUE)[[1]]))
-        if(max(cor) < threshold)
+        if(max(cor) < thres)
           break
         corLayer = sample(which(cor == max(cor), arr.ind = TRUE)[,1],1)
         layers = layers[[-corLayer]]
@@ -427,16 +428,16 @@ raster.reduce <- function(layers, method = "pca", n = NULL, threshold = NULL){
   } else if(method == "pca"){                                  ##if pca
     if(is.null(n))
       n = 3
-    if(sum(!is.na(getValues(layers[[1]]))) > 1000)
-      sr <- sampleRandom(layers, 500)
+    if(sum(!is.na(getValues(layers[[1]]))) > 2000)
+      sr <- sampleRandom(layers, 1000)
     else
       sr <- sampleRandom(layers, as.integer(sum(!is.na(getValues(layers[[1]])))/2))
     pca <- prcomp(sr)
-    layers <- predict(layers, pca, index = 1:n)
+    layers <- raster::predict(layers, pca, index = 1:n)
     for(i in 1:n)
       names(layers[[i]]) <- paste("pca",i)
   }
-  out <- stack(out, layers)
+  out <- raster::stack(out, layers)
   return(out)
 }
 
@@ -504,7 +505,7 @@ raster.east <- function(layer){
 #' @param layers Raster* object as defined by package raster.
 #' @param bg Background data as a matrix of longitude and latitude (two columns). If not defined 1000 points will be randomly selected.
 #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data itself.
-#' @param threshold Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
+#' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
 #' @param polygon Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Only cells connected to other areas inside the polygon are kept.
 #' @param eval Build a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @param jack If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.
@@ -515,7 +516,7 @@ raster.east <- function(layer){
 #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling 190:231-259.
 #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions 17:43-57.
 #' @export
-map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, threshold = 1, polygon = TRUE, eval = TRUE, jack = 0){
+map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, thres = 1, polygon = TRUE, eval = TRUE, jack = 0){
 
   ##if jackknife is to be done
   if(jack > 0){
@@ -527,7 +528,7 @@ map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, threshold = 
     pb <- txtProgressBar(min = 0, max = jack, style = 3)
     for(i in 1:jack){
       jackData <- longlat[-(sample.int(nrow(longlat),1)),]
-      jackRun <- map.sdm(jackData, layers, bg, categorical, threshold, polygon, eval, jack = 0)
+      jackRun <- map.sdm(jackData, layers, bg, categorical, thres, polygon, eval, jack = 0)
       if(eval){
         jackEval <- rbind(jackEval, jackRun[[2]])
         jackRun <- jackRun[[1]]
@@ -561,12 +562,12 @@ map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, threshold = 
   if(is.null(categorical))
     categorical <- find.categorical(layers)
 
-  model <- maxent(layers, longlat, a = bg, factors = categorical) ##build model
-  p <- predict(model, layers)                                     ##do prediction
+  model <- dismo::maxent(layers, longlat, a = bg, factors = categorical) ##build model
+  p <- raster::predict(model, layers)                                     ##do prediction
   e <- dismo::evaluate(longlat, bg, model, layers)                       ##do evaluation of model
-  if(threshold >= 1)
-    threshold <- threshold(e)$spec_sens                                   ##extract threshold from evaluation
-  p <- reclassify(p, matrix(c(0,threshold,0,threshold,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
+  if(thres >= 1)
+    thres <- dismo::threshold(e)$spec_sens                                   ##extract threshold from evaluation
+  p <- reclassify(p, matrix(c(0,thres,0,thres,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
 
   if(polygon){
     vertices <- chull(longlat)
@@ -577,11 +578,12 @@ map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, threshold = 
     poly = SpatialPolygons(list(poly))    ##original EOO, before modelling
     patches <- clump(p, gaps=FALSE)       ##individual patches, numbered
     selPatches <- unique(extract(patches, poly, df = TRUE, weights = TRUE)$clumps) ##which patches are inside original EOO
-    p <- replace(p, !(patches %in% selPatches), 0)
+    #p <- replace(p, !(patches %in% selPatches), 0)
+    p[!(as.vector(patches) %in% as.vector(selPatches))] <- 0
   }
 
   if(eval){
-    e <- dismo::evaluate(longlat, bg, model, layers, threshold)                  ##do evaluation of model with threshold
+    e <- dismo::evaluate(longlat, bg, model, layers, thres)                  ##do evaluation of model with threshold
     auc <- e@auc
     kappa <- e@kappa
     sensitivity <- as.numeric(e@TPR/(e@TPR+e@FNR))
@@ -602,7 +604,7 @@ map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, threshold = 
 #' Map species distribution of habitat specialist.
 #' @description Mapping of all habitat areas where the species is known to occur.
 #' @param longlat Matrix of longitude and latitude (two columns) of each occurrence record.
-#' @param layer RasterLayer object representing the distribution of a single habitat.
+#' @param layer RasterLayer object representing the presence/absence (1/0) of a single habitat type.
 #' @param polygon If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.
 #' @param eval Build a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @details In many cases a species has a very restricted habitat and we generally know where it occurs. In such cases using the distribution of the habitat patches may be enough to map the species.
@@ -644,9 +646,9 @@ map.habitat <- function(longlat, layer, polygon = TRUE, eval = TRUE){
 #' Map recorded species distribution of species.
 #' @description Mapping of all cells where the species is known to occur.
 #' @param longlat Matrix of longitude and latitude (two columns) of each occurrence record.
-#' @param layers Raster* object as defined by package raster.
+#' @param layers Raster* object as defined by package raster. Any raster with the relevant extent and cell size can be used.
 #' @param eval Build a matrix with EOO and AOO calculated from occurrence records only.
-#' @details To be used if either information on the species is very scarce or, on the contrary, complete.
+#' @details To be used if either information on the species is very scarce (and it is not possible to model the species distribution) or, on the contrary, complete (and there is no need to model the distribution).
 #' @return One raster file and possibly a matrix with EOO and AOO.
 #' @export
 # @examples
@@ -677,7 +679,7 @@ map.points <- function(longlat, layers, eval = TRUE){
 ## #' @param projectLayers Raster* object as defined by package raster, used for projection into the future.
 ## #' @param bg Background data as a matrix of longitude and latitude (two columns). If not defined 1000 points will be randomly selected.
 ## #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data itself.
-## #' @param threshold Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
+## #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
 ## #' @param polygon Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Only cells connected to other areas inside the polygon are kept for both present and future projections.
 ## #' @param jack If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.
 ## #' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2016) for both the present and future.
@@ -687,7 +689,7 @@ map.points <- function(longlat, layers, eval = TRUE){
 ## #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling 190:231-259.
 ## #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions 17:43-57.
 ## #' @export
-## map.change <- function(longlat, layers, projectLayers, bg = NULL, categorical = NULL, threshold = 1, polygon = FALSE, jack = 0){
+## map.change <- function(longlat, layers, projectLayers, bg = NULL, categorical = NULL, thres = 1, polygon = FALSE, jack = 0){
 ##   options(warn=-1)
 #   ##if jackknife is to be done
 #   if(jack > 0){
@@ -695,12 +697,12 @@ map.points <- function(longlat, layers, eval = TRUE){
 #       jack = nrow(longlat)
 #     jackEval = matrix(NA, nrow = 1, ncol = 5)
 #     jackMap <- rasterize(longlat, layers[[1]], field = 0, background = 0)
-#     jackMap <- stack(jackMap, jackMap, jackMap)
+#     jackMap <- raster::stack(jackMap, jackMap, jackMap)
 #     jackMap01 <- jackMap
 #     pb <- txtProgressBar(min = 0, max = jack, style = 3)
 #     for(i in 1:jack){
 #       jackData <- longlat[-(sample.int(nrow(longlat),1)),]
-#       jackRun <- map.change(jackData, layers, projectLayers, bg, categorical, threshold, polygon, jack = 0)
+#       jackRun <- map.change(jackData, layers, projectLayers, bg, categorical, thres, polygon, jack = 0)
 #       jackEval <- rbind(jackEval, jackRun[[4]])
 #       jackRun <- list(jackRun[[1]], jackRun[[2]], jackRun[[3]])
 #       for(j in 1:3)
@@ -733,14 +735,14 @@ map.points <- function(longlat, layers, eval = TRUE){
 #   if(is.null(categorical))
 #     categorical = find.categorical(layers)
 #
-#   model <- maxent(layers, longlat, a = bg, factors = categorical) ##build model
-#   present <- predict(model, layers)                             ##do prediction for the present
-#   future <- predict(model, projectLayers)
+#   model <- dismo::maxent(layers, longlat, a = bg, factors = categorical) ##build model
+#   present <- raster::predict(model, layers)                             ##do prediction for the present
+#   future <- raster::predict(model, projectLayers)
 #   e <- dismo::evaluate(longlat, bg, model, layers)                       ##do evaluation of model
-#   if(threshold >= 1)
-#     threshold <- threshold(e)$spec_sens                                   ##extract threshold from evaluation
-#   present <- reclassify(present, matrix(c(0,threshold,0,threshold,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
-#   future <- reclassify(future, matrix(c(0,threshold,0,threshold,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
+#   if(thres >= 1)
+#     thres <- threshold(e)$spec_sens                                   ##extract threshold from evaluation
+#   present <- reclassify(present, matrix(c(0,thres,0,thres,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
+#   future <- reclassify(future, matrix(c(0,thres,0,thres,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
 #
 #   if(polygon){                          ##if species is limited in dispersal ability
 #     vertices <- chull(longlat)
@@ -772,7 +774,7 @@ map.points <- function(longlat, layers, eval = TRUE){
 
 #' Predict species distribution made simple.
 #' @description Prediction of species distributions, multiple species simultaneously, and output of maps, klms and relevant data to files. All using a single step.
-#' @param longlat Matrix of longitude and latitude (two columns) of each occurrence record.
+#' @param longlat data.frame of species names, longitude and latitude (three columns) of each occurrence record.
 #' @param layers Raster* object as defined by package raster. If NULL they are read from data files.
 #' @param file Name of output csv file with all results. If NULL it is named "Results_All.csv".
 #' @param minimum Minimum number of occurrence records to perform a maxent model. If these are lower than the minimum, the function will return a map with presences points only.
@@ -798,7 +800,7 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
   for(s in 1:nSp){
     spData <- longlat[longlat[,1] == spNames[s], -1]
     cat("\nModelling species", s, "of", nSp, "-", toString(spNames[s]), "\n")
-    #spData <- thin(spData)
+    spData <- thin(spData)
     if(newLayers){
       ##check if worldclim and landcover layers are available, if not ask to run red.setup
       if(!file.exists("gis/red_2km_1.tif")){
@@ -810,7 +812,7 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
       layers <- raster.read(spData)
       layers <- raster.reduce(layers)
       layers <- raster.clean(layers)
-      layers <- stack(layers, raster.long(layers[[1]]), raster.lat(layers[[1]]))
+      layers <- raster::stack(layers, raster.long(layers[[1]]), raster.lat(layers[[1]]))
     }
     if(nrow(spData) >= minimum){
       p <- map.sdm(spData, layers, jack = jack)
@@ -853,14 +855,14 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
 #' @param scale If TRUE a distance scale in km is drawn.
 #' @param legend If TRUE the legend for the map is drawn.
 #' @param sites If TRUE the record locations are drawn.
-#' @param EOO If TRUE the polygon representing the Extent of Occurrence is drawn.
+#' @param mcp If TRUE the minimum convex polygon representing the Extent of Occurrence is drawn.
 #' @param print If TRUE a pdf is saved instead of the output to the console.
 #' @examples data(data.records)
 #' data(data.sp)
 #' par(mfrow = c(1,2))
-#' map.draw(data.records, layer = data.sp, EOO = TRUE)
+#' map.draw(data.records, layer = data.sp, mcp = TRUE)
 #' @export
-map.draw <- function(longlat = NULL, layer, spName,  countries = FALSE, scale = TRUE, legend = FALSE, sites = TRUE, EOO = FALSE, print = FALSE){
+map.draw <- function(longlat = NULL, layer, spName,  countries = FALSE, scale = TRUE, legend = FALSE, sites = TRUE, mcp = FALSE, print = FALSE){
   data.worldborders <- NULL
   data(data.worldborders, envir = environment())
   if (countries){
@@ -874,7 +876,7 @@ map.draw <- function(longlat = NULL, layer, spName,  countries = FALSE, scale = 
     scalebar(type="bar", divs = 2, below = "km")
   if (sites && !is.null(longlat))
     points(longlat)
-  if (EOO){
+  if (mcp){
     e <- rasterToPoints(layer, fun = function(dat){dat == 1})   ##convert raster to points
     vertices <- chull(e[,1], e[,2])
     vertices <- c(vertices, vertices[1])
@@ -890,7 +892,7 @@ map.draw <- function(longlat = NULL, layer, spName,  countries = FALSE, scale = 
 
 #' Extent of Occurrence (EOO).
 #' @description Calculates the Extent of Occurrence of a species based on either records or predicted distribution.
-#' @param spData Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object.
+#' @param spData Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence (1/0) map as a RasterLayer object.
 #' @details EOO is calculated as the minimum convex polygon covering all known or predicted sites for the species.
 #' @return A single value in km2.
 #' @examples data(data.records)
@@ -913,10 +915,10 @@ eoo <- function(spData){
 }
 
 #' Area of Occupancy (AOO).
-#' @description Calculates the Area of Occupancy of a species based on either records or predicted distribution.
-#' @param layer RasterLayer object representing the presence/absence map.
-#' @param longlat Matrix of longitude and latitude (two columns) of each occurrence record.
-#' @details AOO is calculated as the area of all known or predicted cells (usually 2x2 km) for the species.
+#' @description Calculates the Area of Occupancy of a species based on either known records or predicted distribution.
+#' @param layer RasterLayer object. If AOO is to be calculated based on known records, any raster with the relevant extent and cell size can be used. If AOO is to be calculated based on predicted distribution, a raster of presence/absence (1/0) is needed.
+#' @param longlat Matrix of longitude and latitude (two columns) of each occurrence record. Only needed if AOO is to be calculated based on known records.
+#' @details AOO is calculated as the area of all known or predicted cells (usually 2x2 km) for the species. Known cells are used if long is given, predicted cells
 #' @return A single value in km2.
 #' @examples data(data.records)
 #' data(data.sp)
@@ -958,7 +960,7 @@ countr <- function(spData, ISO = FALSE){
 #' Output kml files.
 #' @description Creates kml files for Google Maps as required by IUCN guidelines.
 #' @param spData Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object.
-#' @param filename The name of file to save.
+#' @param filename The name of file to save, should end with .kml.
 #' @param minimum If the number of records is lower than the minimum no polygon in drawn, only circles of about 10km radius around each point.
 #' @export
 kml <- function(spData, filename, minimum = 3){

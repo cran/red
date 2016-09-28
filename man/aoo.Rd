@@ -7,18 +7,18 @@
 aoo(layer, longlat = NULL)
 }
 \arguments{
-\item{layer}{RasterLayer object representing the presence/absence map.}
+\item{layer}{RasterLayer object. If AOO is to be calculated based on known records, any raster with the relevant extent and cell size can be used. If AOO is to be calculated based on predicted distribution, a raster of presence/absence (1/0) is needed.}
 
-\item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
+\item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record. Only needed if AOO is to be calculated based on known records.}
 }
 \value{
 A single value in km2.
 }
 \description{
-Calculates the Area of Occupancy of a species based on either records or predicted distribution.
+Calculates the Area of Occupancy of a species based on either known records or predicted distribution.
 }
 \details{
-AOO is calculated as the area of all known or predicted cells (usually 2x2 km) for the species.
+AOO is calculated as the area of all known or predicted cells (usually 2x2 km) for the species. Known cells are used if long is given, predicted cells
 }
 \examples{
 data(data.records)
