@@ -1,11 +1,11 @@
 #####RED - IUCN Redlisting Tools
-#####Version 0.1.1 (2016-09-28)
+#####Version 0.1.2 (2016-10-11)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments.
-#####Changed from v0.1.0:
-#####Notation of mcp in function map.draw
-#####clarified a number of points in documentation
+#####Changed from v0.1.1:
+#####Using bootstrap (with replacement) instead of jackknife in ensemble modelling
+#####Allowing the random selection of layer subsets for ensemble modelling
 
 #####data origins:
 #####climate -> Hijmans, R.J., Cameron, S.E, Parra, J.L., Jones, P.G. & Jarvis A. (2005) Very high resolution interpolated climate surfaces for global land areas. International Journal of Climatology, 25: 1965-1978.
@@ -14,8 +14,8 @@
 
 #####RED Stats:
 #####library("cranlogs")
-#####day <- cran_downloads(package = "red", from = "2016-08-19", to = "2016-08-019")
-#####group <- matrix(day$count, 140, byrow = TRUE)
+#####day <- cran_downloads(package = "red", from = "2016-08-19", to = "2016-09-30")
+#####group <- matrix(day$count, 10, byrow = TRUE)
 #####plot(rowSums(group), type = "n")
 #####lines(rowSums(group))
 
@@ -502,57 +502,61 @@ raster.east <- function(layer){
 #' Predict species distribution.
 #' @description Prediction of potential species distributions using maximum entropy (maxent).
 #' @param longlat Matrix of longitude and latitude (two columns) of each occurrence record.
-#' @param layers Raster* object as defined by package raster.
+#' @param layers Predictor variables, a Raster* object as defined by package raster.
 #' @param bg Background data as a matrix of longitude and latitude (two columns). If not defined 1000 points will be randomly selected.
 #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data itself.
 #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
 #' @param polygon Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Only cells connected to other areas inside the polygon are kept.
 #' @param eval Build a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
-#' @param jack If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.
+#' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points (if bg = NULL) are chosen.
+#' @param subset Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs.
 #' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2016). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from https://www.cs.princeton.edu/~schapire/maxent/. Put the file 'maxent.jar' in the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
-#' @return Either one or two raster files (depending if jackknifes are performed, in which case the second is a probabilistic map from all the runs) and possibly a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model). Aggregate values are taken from maps after transformation of probabilities to incidence, with presence predicted for cells with presence for 50% or more of the runs.
+#' @return Either one or two raster files (depending if ensemble modelling is performed, in which case the second is a probabilistic map from all the runs) and possibly a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model). Aggregate values are taken from maps after transformation of probabilities to incidence, with presence predicted for cells with presence for 50% or more of the runs.
 #' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2016) dismo: Species Distribution Modeling. R package version 1.0-15. https://CRAN.R-project.org/package=dismo
 #' @references Phillips, S.J., Dudik, M., Schapire, R.E. (2004) A maximum entropy approach to species distribution modeling. Proceedings of the Twenty-First International Conference on Machine Learning. p. 655-662.
 #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling 190:231-259.
 #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions 17:43-57.
 #' @export
-map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, thres = 1, polygon = TRUE, eval = TRUE, jack = 0){
+map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, thres = 1, polygon = TRUE, eval = TRUE, runs = 0, subset = 0){
 
-  ##if jackknife is to be done
-  if(jack > 0){
-    if(jack == 1)
-      jack = nrow(longlat)
+  ##if ensemble is to be done
+  if(runs > 0){
     if(eval)
-      jackEval = matrix(NA, nrow = 1, ncol = 7)
-    jackMap <- rasterize(longlat, layers[[1]], field = 0, background = 0)
-    pb <- txtProgressBar(min = 0, max = jack, style = 3)
-    for(i in 1:jack){
-      jackData <- longlat[-(sample.int(nrow(longlat),1)),]
-      jackRun <- map.sdm(jackData, layers, bg, categorical, thres, polygon, eval, jack = 0)
-      if(eval){
-        jackEval <- rbind(jackEval, jackRun[[2]])
-        jackRun <- jackRun[[1]]
+      runEval = matrix(NA, nrow = 1, ncol = 7)
+    runMap <- rasterize(longlat, layers[[1]], field = 0, background = 0)
+    pb <- txtProgressBar(min = 0, max = runs, style = 3)
+    for(i in 1:runs){
+      runData <- longlat[sample(nrow(longlat), replace = TRUE),]
+      if(subset > 0 && subset < dim(layers)[3]){
+        runLayers <- layers[[sample.int(dim(layers)[3], subset)]]
+        thisRun <- map.sdm(runData, runLayers, bg, categorical, thres, polygon, eval, runs = 0, subset = 0)
+      } else {
+        thisRun <- map.sdm(runData, layers, bg, categorical, thres, polygon, eval, runs = 0, subset = 0)
       }
-      jackMap <- jackMap + jackRun / jack
+      if(eval){
+        runEval <- rbind(runEval, thisRun[[2]])
+        thisRun <- thisRun[[1]]
+      }
+      runMap <- runMap + thisRun / runs
       setTxtProgressBar(pb, i)
     }
-    jackMap01 <- reclassify(jackMap, matrix(c(0,0.499,0,0.499,1,1), ncol = 3, byrow = TRUE))
+    runMap01 <- reclassify(runMap, matrix(c(0,0.499,0,0.499,1,1), ncol = 3, byrow = TRUE))
     if(eval){
-      jackEval <- jackEval[-1,]
+      runEval <- runEval[-1,]
       clEval <- matrix(NA, nrow = 4, ncol = 7)
       colnames(clEval) <- c("AUC", "Kappa", "TSS", "EOO (raw)", "EOO (model)", "AOO (raw)", "AOO (model)")
       rownames(clEval) <- c("Aggregate", "LowCL", "Median", "UpCL")
-      clEval[1,1:3] <- colMeans(jackEval[,1:3])
-      clEval[2,] <- apply(jackEval, 2,  quantile, probs= 0.025, na.rm = TRUE)
-      clEval[3,] <- apply(jackEval, 2,  quantile, probs= 0.5, na.rm = TRUE)
-      clEval[4,] <- apply(jackEval, 2,  quantile, probs= 0.975, na.rm = TRUE)
+      clEval[1,1:3] <- colMeans(runEval[,1:3])
+      clEval[2,] <- apply(runEval, 2,  quantile, probs= 0.025, na.rm = TRUE)
+      clEval[3,] <- apply(runEval, 2,  quantile, probs= 0.5, na.rm = TRUE)
+      clEval[4,] <- apply(runEval, 2,  quantile, probs= 0.975, na.rm = TRUE)
       clEval[1,4] <- eoo(longlat)
-      clEval[1,5] <- eoo(jackMap01)
-      clEval[1,6] <- aoo(jackMap01, longlat)
-      clEval[1,7] <- aoo(jackMap01)
-      return(list(jackMap01, jackMap, clEval))
+      clEval[1,5] <- eoo(runMap01)
+      clEval[1,6] <- aoo(runMap01, longlat)
+      clEval[1,7] <- aoo(runMap01)
+      return(list(runMap01, runMap, clEval))
     } else {
-      return (jackMap01)
+      return (runMap01)
     }
   }
 
@@ -681,51 +685,49 @@ map.points <- function(longlat, layers, eval = TRUE){
 ## #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data itself.
 ## #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
 ## #' @param polygon Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Only cells connected to other areas inside the polygon are kept for both present and future projections.
-## #' @param jack If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.
+## #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.
 ## #' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2016) for both the present and future.
-## #' @return Either three or six RasterLayer (depending if jackknifes are performed, in which case the second trio are probabilistic maps from all the runs) and a matrix with Present AOO, Future AOO, Gain, Keep and Loss.
+## #' @return Either three or six RasterLayer (depending if ensemble modelling is performed, in which case the second trio are probabilistic maps from all the runs) and a matrix with Present AOO, Future AOO, Gain, Keep and Loss.
 ## #' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2016) dismo: Species Distribution Modeling. R package version 1.0-15. https://CRAN.R-project.org/package=dismo
 ## #' @references Phillips, S.J., Dudik, M., Schapire, R.E. (2004) A maximum entropy approach to species distribution modeling. Proceedings of the Twenty-First International Conference on Machine Learning. p. 655-662.
 ## #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling 190:231-259.
 ## #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions 17:43-57.
 ## #' @export
-## map.change <- function(longlat, layers, projectLayers, bg = NULL, categorical = NULL, thres = 1, polygon = FALSE, jack = 0){
+## map.change <- function(longlat, layers, projectLayers, bg = NULL, categorical = NULL, thres = 1, polygon = FALSE, runs = 0){
 ##   options(warn=-1)
-#   ##if jackknife is to be done
-#   if(jack > 0){
-#     if(jack == 1)
-#       jack = nrow(longlat)
-#     jackEval = matrix(NA, nrow = 1, ncol = 5)
-#     jackMap <- rasterize(longlat, layers[[1]], field = 0, background = 0)
-#     jackMap <- raster::stack(jackMap, jackMap, jackMap)
-#     jackMap01 <- jackMap
-#     pb <- txtProgressBar(min = 0, max = jack, style = 3)
-#     for(i in 1:jack){
-#       jackData <- longlat[-(sample.int(nrow(longlat),1)),]
-#       jackRun <- map.change(jackData, layers, projectLayers, bg, categorical, thres, polygon, jack = 0)
-#       jackEval <- rbind(jackEval, jackRun[[4]])
-#       jackRun <- list(jackRun[[1]], jackRun[[2]], jackRun[[3]])
+#   ##if ensemble modelling is to be done
+#   if(runs > 0){
+#     runEval = matrix(NA, nrow = 1, ncol = 5)
+#     runMap <- rasterize(longlat, layers[[1]], field = 0, background = 0)
+#     runMap <- raster::stack(runMap, runMap, runMap)
+#     runMap01 <- runMap
+#     pb <- txtProgressBar(min = 0, max = runs, style = 3)
+#     for(i in 1:runs){
+#       runData <- longlat[sample(nrow(longlat), replace = TRUE),]
+#       thisRun <- map.change(runData, layers, projectLayers, bg, categorical, thres, polygon, runs = 0)
+#       runEval <- rbind(runEval, thisRun[[4]])
+#       thisRun <- list(thisRun[[1]], thisRun[[2]], thisRun[[3]])
 #       for(j in 1:3)
-#         jackMap[[j]] <- jackMap[[j]] + jackRun[[j]] / jack
+#         runMap[[j]] <- runMap[[j]] + thisRun[[j]] / runs
 #       setTxtProgressBar(pb, i)
 #     }
 #     for(i in 1:2)
-#       jackMap01[[i]] <- reclassify(jackMap[[i]], matrix(c(0,0.5,0,0.5,1,1), ncol = 3, byrow = TRUE))
-#     jackMap01[[3]] <- jackMap01[[2]] * 2 - jackMap01[[1]] ##gain = 2, kept = 1, loss = -1, never exists = 0
-#     jackEval <- jackEval[-1,]
+#       runMap01[[i]] <- reclassify(runMap[[i]], matrix(c(0,0.5,0,0.5,1,1), ncol = 3, byrow = TRUE))
+#     runMap01[[3]] <- runMap01[[2]] * 2 - runMap01[[1]] ##gain = 2, kept = 1, loss = -1, never exists = 0
+#     runEval <- runEval[-1,]
 #     clEval <- matrix(NA, nrow = 4, ncol = 5)
 #     colnames(clEval) <- c("Present AOO", "Future AOO", "Gain", "Keep", "Loss")
 #     rownames(clEval) <- c("Aggregate", "LowCL", "Median", "UpCL")
-#     clEval[1,1] <- aoo(jackMap01[[1]])
-#     clEval[1,2] <- aoo(jackMap01[[2]])
-#     clEval[1,3] <- cellStats((raster::area(jackMap01[[3]]) * subs(jackMap01[[3]], as.data.frame(matrix(c(0,0,1,0,-1,0,2,1), ncol = 2, byrow = TRUE)))),sum)
-#     clEval[1,4] <- cellStats((raster::area(jackMap01[[3]]) * subs(jackMap01[[3]], as.data.frame(matrix(c(0,0,1,1,-1,0,2,0), ncol = 2, byrow = TRUE)))),sum)
-#     clEval[1,5] <- cellStats((raster::area(jackMap01[[3]]) * subs(jackMap01[[3]], as.data.frame(matrix(c(0,0,1,0,-1,1,2,0), ncol = 2, byrow = TRUE)))),sum)
-#     clEval[2,] <- apply(jackEval, 2,  quantile, probs= 0.025, na.rm = TRUE)
-#     clEval[3,] <- apply(jackEval, 2,  quantile, probs= 0.5, na.rm = TRUE)
-#     clEval[4,] <- apply(jackEval, 2,  quantile, probs= 0.975, na.rm = TRUE)
+#     clEval[1,1] <- aoo(runMap01[[1]])
+#     clEval[1,2] <- aoo(runMap01[[2]])
+#     clEval[1,3] <- cellStats((raster::area(runMap01[[3]]) * subs(runMap01[[3]], as.data.frame(matrix(c(0,0,1,0,-1,0,2,1), ncol = 2, byrow = TRUE)))),sum)
+#     clEval[1,4] <- cellStats((raster::area(runMap01[[3]]) * subs(runMap01[[3]], as.data.frame(matrix(c(0,0,1,1,-1,0,2,0), ncol = 2, byrow = TRUE)))),sum)
+#     clEval[1,5] <- cellStats((raster::area(runMap01[[3]]) * subs(runMap01[[3]], as.data.frame(matrix(c(0,0,1,0,-1,1,2,0), ncol = 2, byrow = TRUE)))),sum)
+#     clEval[2,] <- apply(runEval, 2,  quantile, probs= 0.025, na.rm = TRUE)
+#     clEval[3,] <- apply(runEval, 2,  quantile, probs= 0.5, na.rm = TRUE)
+#     clEval[4,] <- apply(runEval, 2,  quantile, probs= 0.975, na.rm = TRUE)
 #     options(warn=0)
-#     return(list(jackMap01, jackMap, clEval))
+#     return(list(runMap01, runMap, clEval))
 #   }
 #
 #   ##if no background points are given randomly sample them
@@ -778,14 +780,14 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @param layers Raster* object as defined by package raster. If NULL they are read from data files.
 #' @param file Name of output csv file with all results. If NULL it is named "Results_All.csv".
 #' @param minimum Minimum number of occurrence records to perform a maxent model. If these are lower than the minimum, the function will return a map with presences points only.
-#' @param jack If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.
+#' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.
 #' @details Builds maxent species distribution models and outputs maps in both pdf and kml format, plus a file with EOO, AOO and a list of countries where the species is predicted to be present.
 #' @return Writes maps, kmls and all information to a file.
 #' @export
-map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0){
+map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, runs = 0){
   spNames <- unique(longlat[,1])
   nSp <- length(spNames)
-  if (jack > 0) {
+  if (runs > 0) {
     res <- matrix(NA, nrow = nSp, ncol = 11)
     colnames(res) <- c("EOO (raw)", "EOO (aggregate)", "EOO (LowCL)", "EOO (Median)", "EOO (UpCL)", "AOO (raw)", "AOO (aggregate)", "AOO (LowCL)", "AOO (Median)", "AOO (UpCL)", "Countries")
   } else {
@@ -815,7 +817,7 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
       layers <- raster::stack(layers, raster.long(layers[[1]]), raster.lat(layers[[1]]))
     }
     if(nrow(spData) >= minimum){
-      p <- map.sdm(spData, layers, jack = jack)
+      p <- map.sdm(spData, layers, runs = runs)
     } else {
       p <- map.points(spData, layers)
     }
@@ -826,15 +828,15 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
     else
       kml(spData, paste(toString(spNames[s]), ".kml", sep=""), minimum)
     countryList <- countr(p[[1]])
-    if(nrow(spData) >= minimum && jack > 0){
+    if(nrow(spData) >= minimum && runs > 0){
       writeRaster(p[[2]], paste(toString(spNames[s]), "_prob.asc", sep=""), overwrite = TRUE)
       map.draw(spData, p[[2]], paste(toString(spNames[s]), "_prob", sep = ""), legend = TRUE, print = TRUE)
       res[s,] <- c(p[[3]][1,4], p[[3]][1:4,5], p[[3]][1,6], p[[3]][1:4,7], toString(countryList))
-    } else if (nrow(spData) >= minimum && jack <= 0){
+    } else if (nrow(spData) >= minimum && runs <= 0){
       res[s,] <- c(p[[2]][1,4:7], toString(countryList))
-    } else if (jack > 0){
+    } else if (runs > 0){
       res[s,] <- c(p[[2]][1,c(1,1,1,1,1,2,2,2,2,2)], toString(countryList))
-    } else if (jack <= 0){
+    } else if (runs <= 0){
       res[s,] <- c(p[[2]][1,c(1,1,2,2)], toString(countryList))
     }
       write.csv(res[s,], paste(toString(spNames[s]), ".csv", sep = ""))

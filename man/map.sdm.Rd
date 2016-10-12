@@ -5,12 +5,12 @@
 \title{Predict species distribution.}
 \usage{
 map.sdm(longlat, layers, bg = NULL, categorical = NULL, thres = 1,
-  polygon = TRUE, eval = TRUE, jack = 0)
+  polygon = TRUE, eval = TRUE, runs = 0, subset = 0)
 }
 \arguments{
 \item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
 
-\item{layers}{Raster* object as defined by package raster.}
+\item{layers}{Predictor variables, a Raster* object as defined by package raster.}
 
 \item{bg}{Background data as a matrix of longitude and latitude (two columns). If not defined 1000 points will be randomly selected.}
 
@@ -22,10 +22,12 @@ map.sdm(longlat, layers, bg = NULL, categorical = NULL, thres = 1,
 
 \item{eval}{Build a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).}
 
-\item{jack}{If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.}
+\item{runs}{If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points (if bg = NULL) are chosen.}
+
+\item{subset}{Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs.}
 }
 \value{
-Either one or two raster files (depending if jackknifes are performed, in which case the second is a probabilistic map from all the runs) and possibly a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model). Aggregate values are taken from maps after transformation of probabilities to incidence, with presence predicted for cells with presence for 50% or more of the runs.
+Either one or two raster files (depending if ensemble modelling is performed, in which case the second is a probabilistic map from all the runs) and possibly a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model). Aggregate values are taken from maps after transformation of probabilities to incidence, with presence predicted for cells with presence for 50% or more of the runs.
 }
 \description{
 Prediction of potential species distributions using maximum entropy (maxent).

@@ -4,7 +4,7 @@
 \alias{map.easy}
 \title{Predict species distribution made simple.}
 \usage{
-map.easy(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
+map.easy(longlat, layers = NULL, file = NULL, minimum = 3, runs = 0)
 }
 \arguments{
 \item{longlat}{data.frame of species names, longitude and latitude (three columns) of each occurrence record.}
@@ -15,7 +15,7 @@ map.easy(longlat, layers = NULL, file = NULL, minimum = 3, jack = 0)
 
 \item{minimum}{Minimum number of occurrence records to perform a maxent model. If these are lower than the minimum, the function will return a map with presences points only.}
 
-\item{jack}{If 0 no jackknife is performed. If 1, a jackknife with number of runs equivalent to the number of records is made. If > 1 these are the number of runs. For each run one random record is left out at a time and a new set of 1000 background points is chosen.}
+\item{runs}{If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.}
 }
 \value{
 Writes maps, kmls and all information to a file.
