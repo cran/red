@@ -1,11 +1,13 @@
 #####RED - IUCN Redlisting Tools
-#####Version 0.1.2 (2016-10-11)
+#####Version 0.2.0 (2016-12-06)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
-#####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments.
-#####Changed from v0.1.1:
-#####Using bootstrap (with replacement) instead of jackknife in ensemble modelling
-#####Allowing the random selection of layer subsets for ensemble modelling
+#####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments according to the IUCN criteria.
+#####Changed from v0.1.2:
+#####Added function records
+#####Added options in map.habitat
+#####Added options in map.easy
+#####Corrected map.habitat for NA values
 
 #####data origins:
 #####climate -> Hijmans, R.J., Cameron, S.E, Parra, J.L., Jones, P.G. & Jarvis A. (2005) Very high resolution interpolated climate surfaces for global land areas. International Journal of Climatology, 25: 1965-1978.
@@ -14,7 +16,7 @@
 
 #####RED Stats:
 #####library("cranlogs")
-#####day <- cran_downloads(package = "red", from = "2016-08-19", to = "2016-09-30")
+#####day <- cran_downloads(package = "red", from = "2016-08-19", to = "2016-10-11")
 #####group <- matrix(day$count, 10, byrow = TRUE)
 #####plot(rowSums(group), type = "n")
 #####lines(rowSums(group))
@@ -225,6 +227,26 @@ http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.h
   ##Where 1 to 19 are the corresponding bioclim variables, 20 is altitude, 21 to 32 are landcover proportion and 33 is most common landcover per cell
 }
 
+#' Download taxon records from GBIF.
+#' @description Downloads species or higher taxon data from GBIF and outputs records with geographical coordinates.
+#' @param taxon Taxon name.
+#' @return A data.frame with longitude and latitude, plus species names if taxon is above species.
+# @examples records("Nephila senegalensis")
+#' @export
+records <- function(taxon){
+  taxon = unlist(strsplit(taxon, split = " ")[[1]])
+  dat <- dismo::gbif(taxon[1], paste(taxon[2], "*", sep = ""))
+  dat <- dat[c("species","lon","lat")] #filter columns
+  dat <- dat[!(is.na(dat$lon) | is.na(dat$lat)),] #filter rows
+  colnames(dat) <- c("Species", "long", "lat")
+  if (length(taxon) == 1){      #if genus
+    dat[which(is.na(dat[,1])),1] <- paste(taxon, "sp.")
+  } else {                #if species
+    dat <- dat[,-1]
+  }
+  return(dat)
+}
+
 #' Visual detection of outliers.
 #' @description Draws plots of sites in geographical (latlong) and environmental (2-axis PCA) space.
 #' @param longlat Matrix of longitude and latitude (two columns) of species occurrence records.
@@ -236,11 +258,14 @@ http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.h
 # outliers(data.records, data.layers[[1:3]])
 #' @export
 outliers <- function(longlat, layers){
-  pca <- raster.reduce(layers, n = 2)
+  if(dim(layers)[3] == 33)      #if layers come from raster.read
+    pca <- raster.reduce(layers[[1:19]], n = 2)
+  else
+    pca <- raster.reduce(layers, n = 2)
   ##extract pca values from longlat
   pca <- extract(pca, longlat)[,1:2]
   par(mfrow = c(1,2))
-  graphics::plot(longlat, main = "Geographical")
+  map.draw(longlat, layers[[1]], spName = "Geographical")
   raster::plot(pca, main = "Environmental")
 }
 
@@ -326,13 +351,13 @@ raster.read <- function(longlat, layers = NULL, ext = 1){
   if(is.null(layers)){          ##if no layers are provided read the ones available
     ##calculate species range and buffer around it
     if((xlen * ylen) < 10){
-      layers <- raster::stack(raster("gis/red_2km_1.tif"))
+      layers <- raster::stack(raster::raster("gis/red_2km_1.tif"))
       for(i in 2:33)
-        layers <- raster::stack(layers, raster(paste("gis/red_2km_", i, ".tif", sep = "")))
+        layers <- raster::stack(layers, raster::raster(paste("gis/red_2km_", i, ".tif", sep = "")))
     } else {
-      layers <- raster::stack(raster("gis/red_10km_1.tif"))
+      layers <- raster::stack(raster::raster("gis/red_10km_1.tif"))
       for(i in 2:33)
-        layers <- raster::stack(layers, raster(paste("gis/red_10km_", i, ".tif", sep = "")))
+        layers <- raster::stack(layers, raster::raster(paste("gis/red_10km_", i, ".tif", sep = "")))
     }
     ##determine longitude limits of species to check if crop and paste are needed around longitude 180 for Pacific species
     if(xmin < -90 && xmax > 90 && sum(longlat[longlat[,1] < 90 && longlat[,1] > -90,]) != 0){
@@ -443,47 +468,38 @@ raster.reduce <- function(layers, method = "pca", n = NULL, thres = NULL){
 
 #' Create longitude layer.
 #' @description Create a layer depicting longitude based on any other.
-#' @param layer RasterLayer object as defined by package raster.
+#' @param layers Raster* object as defined by package raster.
 #' @details Using longitude (and latitude) in models may help limiting the extrapolation of the predicted area much beyond known areas.
 #' @return A RasterLayer object.
 #' @examples data(data.layers)
-#' raster::plot(raster.long(data.layers[[1]]))
+#' raster::plot(raster.long(data.layers))
 #' @export
-raster.long <- function(layer){
-  x <- rasterToPoints(layer)[,1:2]
-  long <- rasterize(x, layer, x[,1])
-  long <- mask(long, layer)
+raster.long <- function(layers){
+  if(dim(layers)[3] > 1)
+    layers <- layers[[3]]
+  x <- rasterToPoints(layers)[,1:2]
+  long <- rasterize(x, layers, x[,1])
+  long <- mask(long, layers)
   names(long) <- "longitude"
   return(long)
 }
 
 #' Create latitude layer.
 #' @description Create a layer depicting latitude based on any other.
-#' @param layer RasterLayer object as defined by package raster.
+#' @param layers Raster* object as defined by package raster.
 #' @details Using latitude (and longitude) in models may help limiting the extrapolation of the predicted area much beyond known areas.
 #' @return A RasterLayer object.
 #' @examples data(data.layers)
 #' raster::plot(raster.lat(data.layers[[1]]))
 #' @export
-raster.lat <- function(layer){
-  x <- rasterToPoints(layer)[,1:2]
-  lat <- rasterize(x, layer, x[,2])
-  lat <- mask(lat, layer)
+raster.lat <- function(layers){
+  if(dim(layers)[3] > 1)
+    layers <- layers[[3]]
+  x <- rasterToPoints(layers)[,1:2]
+  lat <- rasterize(x, layers, x[,2])
+  lat <- mask(lat, layers)
   names(lat) <- "latitude"
   return(lat)
-}
-
-#' Create northness layer.
-#' @description Create a layer depicting northness based on an elevation layer.
-#' @param layer RasterLayer object of elevation as defined by package raster.
-#' @details Using elevation, aspect can be calculated. Yet, it is a circular variable (0 = 360) and has to be converted to northness and eastness to be useful for modelling.
-#' @return A RasterLayer object.
-#' @examples data(data.sp)
-#' raster::plot(raster.north(data.sp))
-#' @export
-raster.north <- function(layer){
-  asp <- terrain(layer, opt = "aspect")
-  return(cos(asp))
 }
 
 #' Create eastness layer.
@@ -497,6 +513,19 @@ raster.north <- function(layer){
 raster.east <- function(layer){
   asp <- terrain(layer, opt = "aspect")
   return(sin(asp))
+}
+
+#' Create northness layer.
+#' @description Create a layer depicting northness based on an elevation layer.
+#' @param layer RasterLayer object of elevation as defined by package raster.
+#' @details Using elevation, aspect can be calculated. Yet, it is a circular variable (0 = 360) and has to be converted to northness and eastness to be useful for modelling.
+#' @return A RasterLayer object.
+#' @examples data(data.sp)
+#' raster::plot(raster.north(data.sp))
+#' @export
+raster.north <- function(layer){
+  asp <- terrain(layer, opt = "aspect")
+  return(cos(asp))
 }
 
 #' Predict species distribution.
@@ -519,6 +548,7 @@ raster.east <- function(layer){
 #' @export
 map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, thres = 1, polygon = TRUE, eval = TRUE, runs = 0, subset = 0){
 
+  layers <- raster.clean(layers)
   ##if ensemble is to be done
   if(runs > 0){
     if(eval)
@@ -620,6 +650,10 @@ map.sdm <- function(longlat, layers, bg = NULL, categorical = NULL, thres = 1, p
 # raster::plot(map.habitat(data.records, data.sp, eval = FALSE))
 # points(data.records)
 map.habitat <- function(longlat, layer, polygon = TRUE, eval = TRUE){
+  #if(!is.null(filter)){
+  #  if(sole or multiple numbers x,y) subs
+  #  else if(range x:y) reclassify
+  #}
   if(polygon){
     vertices <- chull(longlat)
     vertices <- c(vertices, vertices[1])
@@ -627,13 +661,14 @@ map.habitat <- function(longlat, layer, polygon = TRUE, eval = TRUE){
     poly = Polygon(vertices)
     poly = Polygons(list(poly),1)
     poly = SpatialPolygons(list(poly))    ##minimum convex polygon
-    patches <- clump(layer, gaps=FALSE)       ##individual patches, numbered
+    patches <- raster::clump(layer, gaps=FALSE)       ##individual patches, numbered
     selPatches <- unique(extract(patches, poly, df = TRUE, weights = TRUE)$clumps) ##which patches are inside polygon
   } else {
-    patches <- clump(layer, gaps=FALSE)       ##individual patches, numbered
+    patches <- raster::clump(layer, gaps=FALSE)       ##individual patches, numbered
     selPatches <- unique(extract(patches, longlat, df = TRUE, weights = TRUE)$clumps) ##which patches have the species
   }
-  layer <- mask(patches%in%selPatches, layer) * layer
+  selPatches <- selPatches[!is.na(selPatches)]
+  layer <- mask(patches %in% selPatches, layer) * layer
   if(eval){
     eooRaw <- eoo(longlat)
     eooModel <- eoo(layer)
@@ -778,13 +813,16 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @description Prediction of species distributions, multiple species simultaneously, and output of maps, klms and relevant data to files. All using a single step.
 #' @param longlat data.frame of species names, longitude and latitude (three columns) of each occurrence record.
 #' @param layers Raster* object as defined by package raster. If NULL they are read from data files.
+#' @param n Number of pca axes for environmental data reduction.
 #' @param file Name of output csv file with all results. If NULL it is named "Results_All.csv".
 #' @param minimum Minimum number of occurrence records to perform a maxent model. If these are lower than the minimum, the function will return a map with presences points only.
 #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.
+#' @param subset Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs.
 #' @details Builds maxent species distribution models and outputs maps in both pdf and kml format, plus a file with EOO, AOO and a list of countries where the species is predicted to be present.
 #' @return Writes maps, kmls and all information to a file.
 #' @export
-map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, runs = 0){
+map.easy <- function(longlat, layers = NULL, n = 3, file = NULL, minimum = 3, runs = 0, subset = 0){
+
   spNames <- unique(longlat[,1])
   nSp <- length(spNames)
   if (runs > 0) {
@@ -801,8 +839,8 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, runs = 0)
     newLayers <- FALSE
   for(s in 1:nSp){
     spData <- longlat[longlat[,1] == spNames[s], -1]
+    thinData <- thin(spData)
     cat("\nModelling species", s, "of", nSp, "-", toString(spNames[s]), "\n")
-    spData <- thin(spData)
     if(newLayers){
       ##check if worldclim and landcover layers are available, if not ask to run red.setup
       if(!file.exists("gis/red_2km_1.tif")){
@@ -812,27 +850,29 @@ map.easy <- function(longlat, layers = NULL, file = NULL, minimum = 3, runs = 0)
         return(warning("Please check if maxent.jar is available in the dismo package directory named java. If not, run function red.setup."))
       }
       layers <- raster.read(spData)
-      layers <- raster.reduce(layers)
-      layers <- raster.clean(layers)
+      if(!is.null(n))
+        layers <- raster.reduce(layers, n = n)
       layers <- raster::stack(layers, raster.long(layers[[1]]), raster.lat(layers[[1]]))
     }
-    if(nrow(spData) >= minimum){
-      p <- map.sdm(spData, layers, runs = runs)
+    if(nrow(thinData) >= minimum){
+      p <- map.sdm(thinData, layers, runs = runs, subset = subset)
     } else {
       p <- map.points(spData, layers)
     }
     writeRaster(p[[1]], paste(toString(spNames[s]), ".asc", sep=""), overwrite = TRUE)
-    map.draw(spData, p[[1]], spNames[s], print = TRUE)
-    if(nrow(spData) >= minimum)
+    map.draw(spData, p[[1]], spNames[s], sites = FALSE, print = TRUE)
+    if(nrow(thinData) >= minimum){
       kml(p[[1]], paste(toString(spNames[s]), ".kml", sep=""))
-    else
+      countryList <- countr(p[[1]])
+    } else {
       kml(spData, paste(toString(spNames[s]), ".kml", sep=""), minimum)
-    countryList <- countr(p[[1]])
-    if(nrow(spData) >= minimum && runs > 0){
+      countryList <- countr(spData)
+    }
+    if(nrow(thinData) >= minimum && runs > 0){
       writeRaster(p[[2]], paste(toString(spNames[s]), "_prob.asc", sep=""), overwrite = TRUE)
       map.draw(spData, p[[2]], paste(toString(spNames[s]), "_prob", sep = ""), legend = TRUE, print = TRUE)
       res[s,] <- c(p[[3]][1,4], p[[3]][1:4,5], p[[3]][1,6], p[[3]][1:4,7], toString(countryList))
-    } else if (nrow(spData) >= minimum && runs <= 0){
+    } else if (nrow(thinData) >= minimum && runs <= 0){
       res[s,] <- c(p[[2]][1,4:7], toString(countryList))
     } else if (runs > 0){
       res[s,] <- c(p[[2]][1,c(1,1,1,1,1,2,2,2,2,2)], toString(countryList))

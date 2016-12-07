@@ -4,10 +4,10 @@
 \alias{raster.long}
 \title{Create longitude layer.}
 \usage{
-raster.long(layer)
+raster.long(layers)
 }
 \arguments{
-\item{layer}{RasterLayer object as defined by package raster.}
+\item{layers}{Raster* object as defined by package raster.}
 }
 \value{
 A RasterLayer object.
@@ -20,6 +20,6 @@ Using longitude (and latitude) in models may help limiting the extrapolation of 
 }
 \examples{
 data(data.layers)
-raster::plot(raster.long(data.layers[[1]]))
+raster::plot(raster.long(data.layers))
 }
 

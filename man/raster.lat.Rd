@@ -4,10 +4,10 @@
 \alias{raster.lat}
 \title{Create latitude layer.}
 \usage{
-raster.lat(layer)
+raster.lat(layers)
 }
 \arguments{
-\item{layer}{RasterLayer object as defined by package raster.}
+\item{layers}{Raster* object as defined by package raster.}
 }
 \value{
 A RasterLayer object.

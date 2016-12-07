@@ -4,18 +4,23 @@
 \alias{map.easy}
 \title{Predict species distribution made simple.}
 \usage{
-map.easy(longlat, layers = NULL, file = NULL, minimum = 3, runs = 0)
+map.easy(longlat, layers = NULL, n = 3, file = NULL, minimum = 3,
+  runs = 0, subset = 0)
 }
 \arguments{
 \item{longlat}{data.frame of species names, longitude and latitude (three columns) of each occurrence record.}
 
 \item{layers}{Raster* object as defined by package raster. If NULL they are read from data files.}
 
+\item{n}{Number of pca axes for environmental data reduction.}
+
 \item{file}{Name of output csv file with all results. If NULL it is named "Results_All.csv".}
 
 \item{minimum}{Minimum number of occurrence records to perform a maxent model. If these are lower than the minimum, the function will return a map with presences points only.}
 
 \item{runs}{If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.}
+
+\item{subset}{Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs.}
 }
 \value{
 Writes maps, kmls and all information to a file.
