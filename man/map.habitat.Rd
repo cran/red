@@ -4,24 +4,24 @@
 \alias{map.habitat}
 \title{Map species distribution of habitat specialist.}
 \usage{
-map.habitat(longlat, layer, polygon = TRUE, eval = TRUE)
+map.habitat(longlat, layer, mcp = FALSE, eval = TRUE)
 }
 \arguments{
-\item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
+\item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.}
 
 \item{layer}{RasterLayer object representing the presence/absence (1/0) of a single habitat type.}
 
-\item{polygon}{If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.}
+\item{mcp}{If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.}
 
-\item{eval}{Build a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).}
+\item{eval}{If TRUE, build a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).}
 }
 \value{
-One raster file and possibly a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
+One raster object and, if eval = TRUE, a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 }
 \description{
-Mapping of all habitat areas where the species is known to occur.
+Mapping of all habitat patches where the species is known to occur.
 }
 \details{
-In many cases a species has a very restricted habitat and we generally know where it occurs. In such cases using the distribution of the habitat patches may be enough to map the species.
+In many cases a species has a very restricted habitat and we generally know where it occurs. In such cases using the distribution of the known habitat patches may be enough to map the species.
 }
 

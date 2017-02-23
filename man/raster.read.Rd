@@ -7,29 +7,29 @@
 raster.read(longlat, layers = NULL, ext = 1)
 }
 \arguments{
-\item{longlat}{Matrix of longitude and latitude (two columns) of species occurrence records.}
+\item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.}
 
 \item{layers}{Raster* object as defined by package raster.}
 
-\item{ext}{Buffer around the known records used to crop layers. It is relative to the maximum distance between any two records.}
+\item{ext}{Either extent of map or buffer around the known records used to crop layers. If buffer, it is relative to the maximum distance between any two records.}
 }
 \value{
-A RasterStack object (Variables 1-19 = bioclim, 20 = elevation, 21-32 = proportion landcover, 33 = most common landcover).
+A RasterStack object (If no layers are given: Variables 1-19 = bioclim, 20 = elevation, 21-32 = proportion landcover, 33 = most common landcover).
 }
 \description{
 Read raster layers of environmental or other variables and crop them to a given extent around the known occurrences.
 }
 \details{
-If layers are not given, the function will read either 1 arc-minute (approx. 2km) or 5 arc-minutes (approx. 10km) resolution rasters from worldclim (Hijmans et al. 2005) and landcover (Tuanmu & Jetz 2014) if these are provided in the data folder of the package (see read.me file on how to do it).
+If layers are not given, the function will read either 1 arc-minute (approx. 2km) or 5 arc-minutes (approx. 10km) resolution rasters from worldclim (Hijmans et al. 2005) and landcover (Tuanmu & Jetz 2014) if red.setup() is run previously.
 }
 \examples{
-data(data.layers)
-data(data.records)
+data(red.layers)
+data(red.records)
 par(mfrow=c(1,2))
-raster::plot(data.layers[[1]])
-points(data.records)
-croppedLayers <- raster.read(data.records, data.layers, 0.1)
+raster::plot(red.layers[[1]])
+points(red.records)
+croppedLayers <- raster.read(red.records, red.layers, 0.1)
 raster::plot(croppedLayers[[1]])
-points(data.records)
+points(red.records)
 }
 

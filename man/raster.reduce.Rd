@@ -9,7 +9,7 @@ raster.reduce(layers, method = "pca", n = NULL, thres = NULL)
 \arguments{
 \item{layers}{Raster* object as defined by package raster.}
 
-\item{method}{Either Principal Components Analysis (pca, default) or Pearson's correlation (cor).}
+\item{method}{Either Principal Components Analysis ("pca", default) or Pearson's correlation ("cor").}
 
 \item{n}{Number of layers to reduce to.}
 

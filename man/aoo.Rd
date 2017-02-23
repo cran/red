@@ -4,12 +4,10 @@
 \alias{aoo}
 \title{Area of Occupancy (AOO).}
 \usage{
-aoo(layer, longlat = NULL)
+aoo(spData)
 }
 \arguments{
-\item{layer}{RasterLayer object. If AOO is to be calculated based on known records, any raster with the relevant extent and cell size can be used. If AOO is to be calculated based on predicted distribution, a raster of presence/absence (1/0) is needed.}
-
-\item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record. Only needed if AOO is to be calculated based on known records.}
+\item{spData}{One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).}
 }
 \value{
 A single value in km2.
@@ -18,12 +16,10 @@ A single value in km2.
 Calculates the Area of Occupancy of a species based on either known records or predicted distribution.
 }
 \details{
-AOO is calculated as the area of all known or predicted cells (usually 2x2 km) for the species. Known cells are used if long is given, predicted cells
+AOO is calculated as the area of all known or predicted cells for the species. The resolution will be either exactly (if spData is in meters) or approximately (otherwise) 2x2km as required by IUCN).
 }
 \examples{
-data(data.records)
-data(data.sp)
-aoo(data.sp, data.records)
-aoo(data.sp)
+data(red.distribution)
+aoo(red.distribution)
 }
 

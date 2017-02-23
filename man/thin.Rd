@@ -7,7 +7,7 @@
 thin(longlat, distance = 0.01, relative = TRUE, runs = 100)
 }
 \arguments{
-\item{longlat}{Matrix of longitude and latitude (two columns) of species occurrence records.}
+\item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.}
 
 \item{distance}{Distance either in relative terms (proportion of maximum distance between any two records) or in raster units.}
 
@@ -16,14 +16,14 @@ thin(longlat, distance = 0.01, relative = TRUE, runs = 100)
 \item{runs}{Number of runs}
 }
 \value{
-A matrix of longitude and latitude (two columns) of species occurrence records separated by at least the given distance.
+A matrix of species occurrence records separated by at least the given distance.
 }
 \description{
 Thinning of records with minimum distances either absolute or relative to the species range.
 }
 \details{
 Clumped distribution records due to ease of accessibility of sites, emphasis of sampling on certain areas in the past, etc. may bias species distribution models.
-The algorithm used here eliminates records closer than a given thres to any other record. The choice of records to eliminate is random, so a number of runs are made and the one keeping more of the original records is chosen.
+The algorithm used here eliminates records closer than a given distance to any other record. The choice of records to eliminate is random, so a number of runs are made and the one keeping more of the original records is chosen.
 }
 \examples{
 records <- matrix(sample(100), ncol = 2)

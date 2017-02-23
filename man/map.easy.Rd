@@ -2,33 +2,42 @@
 % Please edit documentation in R/red.R
 \name{map.easy}
 \alias{map.easy}
-\title{Predict species distribution made simple.}
+\title{Species distributions made easy (multiple species).}
 \usage{
-map.easy(longlat, layers = NULL, n = 3, file = NULL, minimum = 3,
-  runs = 0, subset = 0)
+map.easy(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL,
+  minmodel = 0, testpercentage = 0, mintest = 20, runs = 0,
+  subset = 0)
 }
 \arguments{
-\item{longlat}{data.frame of species names, longitude and latitude (three columns) of each occurrence record.}
+\item{longlat}{data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.}
 
-\item{layers}{Raster* object as defined by package raster. If NULL they are read from data files.}
+\item{layers}{If NULL analyses are done with environmental layers read from data files of red.setup(). If a Raster* object as defined by package raster, analyses use these.}
 
-\item{n}{Number of pca axes for environmental data reduction.}
+\item{dem}{RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible.}
+
+\item{pca}{Number of pca axes for environmental data reduction. If 0 (default) no pca is made.}
 
 \item{file}{Name of output csv file with all results. If NULL it is named "Results_All.csv".}
 
-\item{minimum}{Minimum number of occurrence records to perform a maxent model. If these are lower than the minimum, the function will return a map with presences points only.}
+\item{minmodel}{Minimum number of occurrence records to perform a maxent model. If 0 (default), the function will perform analyses without modelling any species.}
 
-\item{runs}{If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.}
+\item{testpercentage}{Percentage of records used for testing only. If 0 all records will be used for both training and testing.}
 
-\item{subset}{Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs.}
+\item{mintest}{Minimim number of total occurrence records of any species to set aside a test set. Only used if testpercentage > 0.}
+
+\item{runs}{If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.}
+
+\item{subset}{Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs. Using a small number of layers is usually better than using many variables for rare species, with few occurrence records (Lomba et al. 2010, Breiner et al. 2015).}
 }
 \value{
-Writes maps, kmls and all information to a file.
+Outputs maps in asc, pdf and kml format, plus a file with EOO, AOO and a list of countries where the species is predicted to be present if possible to extract.
 }
 \description{
-Prediction of species distributions, multiple species simultaneously, and output of maps, klms and relevant data to files. All using a single step.
+Single step for prediction of multiple species distributions. Output of maps (in pdf format), klms (for Google Earth) and relevant data (in csv format).
 }
-\details{
-Builds maxent species distribution models and outputs maps in both pdf and kml format, plus a file with EOO, AOO and a list of countries where the species is predicted to be present.
+\references{
+Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
+
+Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 }
 

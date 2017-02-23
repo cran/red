@@ -13,13 +13,13 @@ raster.clean(layers)
 A Raster* object, same class as layers.
 }
 \description{
-Crop raster layers to minimum size and uniformize NA values accross layers.
+Crop raster layers to minimum size possible and uniformize NA values across layers.
 }
 \details{
 Excludes all marginal rows and columns with only NA values and change values to NA if they are NA in any of the layers.
 }
 \examples{
-data(data.layers)
-raster::plot(raster.clean(data.layers))
+data(red.layers)
+raster::plot(raster.clean(red.layers))
 }
 

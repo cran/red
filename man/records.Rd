@@ -13,6 +13,12 @@ records(taxon)
 A data.frame with longitude and latitude, plus species names if taxon is above species.
 }
 \description{
-Downloads species or higher taxon data from GBIF and outputs records with geographical coordinates.
+Downloads species or higher taxon data from GBIF and outputs non-duplicate records with geographical coordinates.
+}
+\details{
+As always when using data from multiple sources the user should be careful and check if records "make sense". This can be done by either ploting them in a map (e.g. using red::map.draw()) or using red::outliers().
+}
+\examples{
+records("Nephila senegalensis")
 }
 

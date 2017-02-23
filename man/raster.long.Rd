@@ -19,7 +19,7 @@ Create a layer depicting longitude based on any other.
 Using longitude (and latitude) in models may help limiting the extrapolation of the predicted area much beyond known areas.
 }
 \examples{
-data(data.layers)
-raster::plot(raster.long(data.layers))
+data(red.layers)
+raster::plot(raster.long(red.layers))
 }
 

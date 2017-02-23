@@ -4,10 +4,10 @@
 \alias{raster.east}
 \title{Create eastness layer.}
 \usage{
-raster.east(layer)
+raster.east(dem)
 }
 \arguments{
-\item{layer}{RasterLayer object of elevation as defined by package raster.}
+\item{dem}{RasterLayer object of elevation (a digital elevation model - DEM) as defined by package raster.}
 }
 \value{
 A RasterLayer object.
@@ -19,7 +19,7 @@ Create a layer depicting eastness based on an elevation layer.
 Using elevation, aspect can be calculated. Yet, it is a circular variable (0 = 360) and has to be converted to northness and eastness to be useful for modelling.
 }
 \examples{
-data(data.sp)
-raster::plot(raster.east(data.sp))
+data(red.layers)
+raster::plot(raster.east(red.layers[[3]]))
 }
 

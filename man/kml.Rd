@@ -7,7 +7,7 @@
 kml(spData, filename, minimum = 3)
 }
 \arguments{
-\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object.}
+\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).}
 
 \item{filename}{The name of file to save, should end with .kml.}
 

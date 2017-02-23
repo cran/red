@@ -4,17 +4,17 @@
 \alias{map.draw}
 \title{Map creation.}
 \usage{
-map.draw(longlat = NULL, layer, spName, countries = FALSE, scale = TRUE,
+map.draw(longlat = NULL, layer, spName, borders = FALSE, scale = TRUE,
   legend = FALSE, sites = TRUE, mcp = FALSE, print = FALSE)
 }
 \arguments{
-\item{longlat}{Matrix of longitude and latitude (two columns) of each occurrence record.}
+\item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.}
 
 \item{layer}{RasterLayer object representing the presence/absence map for the species.}
 
 \item{spName}{String of species name.}
 
-\item{countries}{If TRUE country borders are drawn.}
+\item{borders}{If TRUE country borders are drawn.}
 
 \item{scale}{If TRUE a distance scale in km is drawn.}
 
@@ -30,9 +30,9 @@ map.draw(longlat = NULL, layer, spName, countries = FALSE, scale = TRUE,
 Creates maps ready to print in pdf or other formats.
 }
 \examples{
-data(data.records)
-data(data.sp)
+data(red.records)
+data(red.distribution)
 par(mfrow = c(1,2))
-map.draw(data.records, layer = data.sp, mcp = TRUE)
+map.draw(red.records, layer = red.distribution, mcp = TRUE)
 }
 

@@ -7,7 +7,7 @@
 eoo(spData)
 }
 \arguments{
-\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence (1/0) map as a RasterLayer object.}
+\item{spData}{One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).}
 }
 \value{
 A single value in km2.
@@ -19,9 +19,9 @@ Calculates the Extent of Occurrence of a species based on either records or pred
 EOO is calculated as the minimum convex polygon covering all known or predicted sites for the species.
 }
 \examples{
-data(data.records)
-data(data.sp)
-eoo(data.records)
-eoo(data.sp)
+data(red.records)
+data(red.distribution)
+eoo(red.records)
+eoo(red.distribution)
 }
 

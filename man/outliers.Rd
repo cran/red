@@ -7,17 +7,22 @@
 outliers(longlat, layers)
 }
 \arguments{
-\item{longlat}{Matrix of longitude and latitude (two columns) of species occurrence records.}
+\item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.}
 
 \item{layers}{Raster* object as defined by package raster. It can be any set of environmental layers thought to allow the identification of environmental outliers.}
 }
 \value{
-No values are returned, two plots are drawn for visual inspection.
+A data.frame with coordinate values and distance to centroid in pca is returned. Two plots are drawn for visual inspection. The environmental plot includes row numbers for easy identification of possible outliers.
 }
 \description{
-Draws plots of sites in geographical (latlong) and environmental (2-axis PCA) space.
+Draws plots of sites in geographical (longlat) and environmental (2-axis PCA) space.
 }
 \details{
 Erroneous data sources or errors in transcriptions may introduce outliers that can be easily detected by looking at simple graphs of geographical or environmental space.
+}
+\examples{
+data(red.records)
+data(red.layers)
+outliers(red.records, red.layers[[1:3]])
 }
 

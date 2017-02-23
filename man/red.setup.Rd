@@ -2,7 +2,7 @@
 % Please edit documentation in R/red.R
 \name{red.setup}
 \alias{red.setup}
-\title{Red package setup.}
+\title{Download and setup GIS files.}
 \usage{
 red.setup()
 }
@@ -12,12 +12,12 @@ Setup red to work with species distribution modelling and layers available onlin
 \details{
 Please check that you have at least 20Gb free in your disk (and a fast internet connection) to download all files. In the end of the process "only" 3Gb will be left though. This function will:
 1. Check if maxent.jar is available in the dismo package directory.
-2. Create a folder named "gis" in the working directory.
+2. Ask user input for GIS directory.
 3. Download global bioclim and elevation files (20) from http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/.
 4. Download landcover files (12) from http://data.earthenv.org/consensus_landcover/without_DISCover/.
 5. Unzip all files and delete the originals.
 6. Create a new layer (1) with the dominant land cover at each cell.
-7. Resample all files (33) to 2x2km (as required by IUCN) and 10x10km (for use with widespread species) grid cells.
+7. Resample all files (33) to approximately 2x2km (as required by IUCN) and 10x10km (for use with widespread species) grid cells.
 8. Delete the 1x1km files.
 Sit back and enjoy, this should take a while.
 }
