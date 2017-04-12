@@ -35,4 +35,3 @@ data(red.distribution)
 par(mfrow = c(1,2))
 map.draw(red.records, layer = red.distribution, mcp = TRUE)
 }
-

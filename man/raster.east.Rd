@@ -22,4 +22,3 @@ Using elevation, aspect can be calculated. Yet, it is a circular variable (0 = 3
 data(red.layers)
 raster::plot(raster.east(red.layers[[3]]))
 }
-

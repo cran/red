@@ -25,4 +25,3 @@ Reduce the number of layers by either performing a PCA on them or by eliminating
 Using a large number of explanatory variables in models with few records may lead to overfitting. This function allows to avoid it as much as possible.
 If both n and thres are given, n has priority. If method is not recognized and layers come from raster.read function, only landcover is reduced by using only the dominating landuse of each cell.
 }
-

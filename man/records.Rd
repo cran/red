@@ -21,4 +21,3 @@ As always when using data from multiple sources the user should be careful and c
 \examples{
 records("Nephila senegalensis")
 }
-

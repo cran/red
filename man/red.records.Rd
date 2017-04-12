@@ -12,4 +12,3 @@ data(red.records)
 Occurrence records for a fictional species in Finland.
 }
 \keyword{datasets}
-

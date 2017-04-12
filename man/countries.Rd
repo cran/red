@@ -26,4 +26,3 @@ data(red.distribution)
 countries(red.records)
 countries(red.distribution, ISO = TRUE)
 }
-

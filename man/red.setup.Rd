@@ -21,4 +21,3 @@ Please check that you have at least 20Gb free in your disk (and a fast internet 
 8. Delete the 1x1km files.
 Sit back and enjoy, this should take a while.
 }
-

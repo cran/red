@@ -48,4 +48,3 @@ Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling o
 
 Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions, 17: 43-57.
 }
-

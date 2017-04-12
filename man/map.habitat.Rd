@@ -24,4 +24,3 @@ Mapping of all habitat patches where the species is known to occur.
 \details{
 In many cases a species has a very restricted habitat and we generally know where it occurs. In such cases using the distribution of the known habitat patches may be enough to map the species.
 }
-

@@ -32,4 +32,3 @@ graphics::plot(records)
 records <- thin(records, 0.1)
 graphics::plot(records)
 }
-

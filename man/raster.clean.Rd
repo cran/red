@@ -22,4 +22,3 @@ Excludes all marginal rows and columns with only NA values and change values to 
 data(red.layers)
 raster::plot(raster.clean(red.layers))
 }
-

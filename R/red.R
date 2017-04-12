@@ -1,18 +1,10 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.0.0 (2017-02-23)
+#####Version 1.0.1 (2017-04-12)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v0.2.0:
-#####Added function red.setDir
-#####Added function red.getDir
-#####Added function rli.sampled
-#####Added function elevation
-#####Added elevation in map.easy
-#####Improved functions EOO, AOO, map.sdm, map.habitat, map.easy
-#####Added further outputs in function outliers
-#####Added warning in raster.read if no gis directory is found
-#####GIS files can be in any directory besides wd
+#####Changed from v1.0.0:
+#####Improved memory use for large raster files
 
 #Todo:
 # rli*: add trees (for phylogenetic and functional diversity)
@@ -38,17 +30,16 @@ library("dismo")
 library("geosphere")
 library("graphics")
 library("grDevices")
-library("igraph")
 library("jsonlite")
 library("maptools")
 library("raster")
 library("rgdal")
 library("rgeos")
-library("rJava")
 library("sp")
 library("stats")
 library("utils")
 #' @import graphics
+#' @import jsonlite
 #' @import maptools
 #' @import rgdal
 #' @import rgeos
@@ -62,6 +53,8 @@ library("utils")
 ###############################################################################
 ##############################AUX FUNCTIONS####################################
 ###############################################################################
+
+raster::rasterOptions(maxmemory = 2e+09)
 
 ##warn if maxent.jar is not available
 warnMaxent <- function(){
@@ -423,7 +416,7 @@ raster.read <- function(longlat, layers = NULL, ext = 1){
     gisdir = red.getDir()
 
     ##calculate species range and buffer around it
-    if((xlen * ylen) < 10){
+    if((xlen * ylen) < 2){
       layers <- raster::stack(raster::raster(paste(gisdir, "red_2km_1.tif", sep = "")))
       for(i in 2:33)
         layers <- raster::stack(layers, raster::raster(paste(gisdir, "red_2km_", i, ".tif", sep = "")))
@@ -623,7 +616,9 @@ raster.north <- function(dem){
 #' @export
 map.sdm <- function(longlat, layers, categorical = NULL, thres = 0, testpercentage = 0, mcp = TRUE, eval = TRUE, runs = 0, subset = 0){
 
+  raster::rasterOptions(maxmemory = 2e+09)
   longlat <- longlat[!is.na(extract(layers[[1]], longlat)),]
+
   ##if ensemble is to be done
   if(runs > 0){
     if(eval)
@@ -689,7 +684,6 @@ map.sdm <- function(longlat, layers, categorical = NULL, thres = 0, testpercenta
     llTrain <- longlat[-testRecords,]
     llTest <- longlat[testRecords,]
   }
-
   mod <- dismo::maxent(layers, llTrain, a = bg, factors = categorical) ##build model
   p <- raster::predict(mod, layers)                                     ##do prediction
 
@@ -948,9 +942,6 @@ map.easy <- function(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL, m
     }
     cat("\nSpecies", s, "of", nSp, "-", toString(spNames[s]), "\n")
     if(newLayers){
-      ##check if worldclim and landcover layers are available, if not ask to run red.setup
-      gisdir = red.getDir()
-      ##test if maxent.jar is in the right directory
       layers <- raster.read(spData)
       if(newDem)
         dem <- layers[[20]]

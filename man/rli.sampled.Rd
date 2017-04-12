@@ -37,4 +37,3 @@ Butchart, S.H.M., Akcakaya, H.R., Chanson, J., Baillie, J.E.M., Collen, B., Quad
 
 Stuart, S.N., Wilson, E.O., McNeely, J.A., Mittermeier, R.A. & Rodriguez, J.P. (2010) The barometer of Life. Science 328, 117.
 }
-

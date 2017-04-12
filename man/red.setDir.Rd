@@ -12,4 +12,3 @@ Setup directory where GIS files are stored.
 \details{
 Writes a txt file in the red directory allowing the package to always access the world GIS files directory.
 }
-

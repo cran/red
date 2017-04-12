@@ -12,4 +12,3 @@ data(worldborders)
 World country borders.
 }
 \keyword{datasets}
-

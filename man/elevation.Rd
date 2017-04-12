@@ -28,4 +28,3 @@ dem = red.layers[[3]]
 elevation(red.records, dem)
 elevation(red.distribution, dem)
 }
-

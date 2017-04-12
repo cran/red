@@ -24,4 +24,3 @@ data(red.distribution)
 eoo(red.records)
 eoo(red.distribution)
 }
-

@@ -25,4 +25,3 @@ data(red.records)
 data(red.layers)
 outliers(red.records, red.layers[[1:3]])
 }
-

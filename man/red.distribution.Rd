@@ -12,4 +12,3 @@ data(red.distribution)
 Geographic range for a fictional species in Finland.
 }
 \keyword{datasets}
-

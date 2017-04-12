@@ -40,4 +40,3 @@ Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitati
 
 Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 }
-

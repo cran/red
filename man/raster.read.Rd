@@ -32,4 +32,3 @@ croppedLayers <- raster.read(red.records, red.layers, 0.1)
 raster::plot(croppedLayers[[1]])
 points(red.records)
 }
-

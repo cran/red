@@ -22,4 +22,3 @@ AOO is calculated as the area of all known or predicted cells for the species. T
 data(red.distribution)
 aoo(red.distribution)
 }
-

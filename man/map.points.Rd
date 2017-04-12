@@ -28,4 +28,3 @@ data(red.layers)
 raster::plot(map.points(red.records, red.layers, eval = FALSE))
 points(red.records)
 }
-

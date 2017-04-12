@@ -22,4 +22,3 @@ Using latitude (and longitude) in models may help limiting the extrapolation of 
 data(red.layers)
 raster::plot(raster.lat(red.layers[[1]]))
 }
-

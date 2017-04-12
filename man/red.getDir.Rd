@@ -12,4 +12,3 @@ Read directory where GIS files are stored.
 \details{
 Reads a txt file pointing to where the world GIS files are stored.
 }
-

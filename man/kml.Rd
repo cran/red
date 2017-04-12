@@ -16,4 +16,3 @@ kml(spData, filename, minimum = 3)
 \description{
 Creates kml files for Google Maps as required by IUCN guidelines.
 }
-
