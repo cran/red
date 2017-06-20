@@ -4,14 +4,19 @@
 \alias{kml}
 \title{Output kml files.}
 \usage{
-kml(spData, filename, minimum = 3)
+kml(spData, filename, minimum = 3, radius = 0.1)
 }
 \arguments{
 \item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).}
 
 \item{filename}{The name of file to save, should end with .kml.}
 
-\item{minimum}{If the number of records is lower than the minimum no polygon in drawn, only circles of about 10km radius around each point.}
+\item{minimum}{If the number of records is lower than the minimum no polygon in drawn, only circles of given radius around each point.}
+
+\item{radius}{radius of circles in degrees if the number of records is lower than the minimum.}
+}
+\value{
+A kml with minimum convex polygon or circles around records.
 }
 \description{
 Creates kml files for Google Maps as required by IUCN guidelines.

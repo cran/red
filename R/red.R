@@ -1,16 +1,20 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.0.1 (2017-04-12)
+#####Version 1.1.0 (2017-06-20)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v1.0.0:
-#####Improved memory use for large raster files
+#####Changed from v1.0.1:
+#####Added function move
+#####Added param error in map.sdm and map.easy
+#####Added param radius in kml
+#####Solved limitations with large integer overflow
 
 #Todo:
 # rli*: add trees (for phylogenetic and functional diversity)
 # map.habitat: automatically select habitat or range
 # map.change: new function and automated download of future climate layers and forest change across years
-# map.sdm: multicore
+# map.sdm: multicore p multiple runs
+# kbas: implement
 
 #####data origins:
 #####climate -> Hijmans, R.J., Cameron, S.E, Parra, J.L., Jones, P.G. & Jarvis A. (2005) Very high resolution interpolated climate surfaces for global land areas. International Journal of Climatology, 25: 1965-1978.
@@ -296,6 +300,38 @@ records <- function(taxon){
     dat <- dat[,-1]
   }
   return(dat)
+}
+
+#' Move records to closest non-NA cell.
+#' @description Identifies and moves presence records to cells with environmental values.
+#' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.
+#' @param layers Raster* object as defined by package raster.
+#' @param buffer Maximum distance in map units that a record will move. If 0 all NA records will be changed.
+#' @details Often records are in coastal or other areas for which no environmental data is available. This function moves such records to the closest cells with data so that no information is lost during modelling.
+#' @return A matrix with new coordinate values.
+#' @examples rast <- raster::raster(matrix(c(rep(NA,100), rep(1,100), rep(NA,100)), ncol = 15))
+#' pts <- cbind(runif(100, 0, 0.55), runif(100, 0, 1))
+#' raster::plot(rast)
+#' points(pts)
+#' pts <- move(pts, rast)
+#' raster::plot(rast)
+#' points(pts)
+#' @export
+move <- function(longlat, layers, buffer = 0){
+  layers <- layers[[1]]
+  values <- extract(layers, longlat)   #get values of each record
+  suppressWarnings(
+    for(i in which(is.na(values))){    #if a value is NA, move it
+      distRaster = raster::distanceFromPoints(layers, longlat[i,])
+      distRaster = mask(distRaster, layers)
+      vmin = raster::minValue(distRaster)
+      if(buffer <= 0 || buffer > vmin){
+        vmin = rasterToPoints(distRaster, function(x) x == vmin)
+        longlat[i,] = vmin[1,1:2]
+      }
+    }
+  )
+  return(longlat)
 }
 
 #' Visual detection of outliers.
@@ -598,6 +634,7 @@ raster.north <- function(dem){
 #' @description Prediction of potential species distributions using maximum entropy (maxent).
 #' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.
 #' @param layers Predictor variables, a Raster* object as defined by package raster.
+#' @param error Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.
 #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data.
 #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 0 this will be the value that maximizes the sum of sensitivity and specificity.
 #' @param testpercentage Percentage of records used for testing only. If 0 all records will be used for both training and testing.
@@ -614,10 +651,9 @@ raster.north <- function(dem){
 #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling, 190: 231-259.
 #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions, 17: 43-57.
 #' @export
-map.sdm <- function(longlat, layers, categorical = NULL, thres = 0, testpercentage = 0, mcp = TRUE, eval = TRUE, runs = 0, subset = 0){
+map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0, testpercentage = 0, mcp = TRUE, eval = TRUE, runs = 0, subset = 0){
 
   raster::rasterOptions(maxmemory = 2e+09)
-  longlat <- longlat[!is.na(extract(layers[[1]], longlat)),]
 
   ##if ensemble is to be done
   if(runs > 0){
@@ -629,9 +665,9 @@ map.sdm <- function(longlat, layers, categorical = NULL, thres = 0, testpercenta
     for(i in 1:runs){
       if(subset > 0 && subset < dim(layers)[3]){
         runLayers <- layers[[sample.int(dim(layers)[3], subset)]]
-        thisRun <- map.sdm(longlat, runLayers, categorical, thres, testpercentage, mcp, eval, runs = 0, subset = 0)
+        thisRun <- map.sdm(longlat, runLayers, error, categorical, thres, testpercentage, mcp, eval, runs = 0, subset = 0)
       } else {
-        thisRun <- map.sdm(longlat, layers, categorical, thres, testpercentage, mcp, eval, runs = 0, subset = 0)
+        thisRun <- map.sdm(longlat, layers, error, categorical, thres, testpercentage, mcp, eval, runs = 0, subset = 0)
       }
       runAUC = 1
       if(eval){
@@ -669,6 +705,18 @@ map.sdm <- function(longlat, layers, categorical = NULL, thres = 0, testpercenta
       return (consensusMap)
     }
   }
+
+  #if there is error randomly move points within its radius
+  if(!is.null(error)){
+    for(i in 1:nrow(longlat)){
+      #move up to given error (angular movement converted to x and y)
+      rndAngle = sample(1:360, 1)
+      rndDist = runif(1, 0, error[i])
+      longlat[i,1] = longlat[i,1] + rndDist * cos(rndAngle)
+      longlat[i,2] = longlat[i,2] + rndDist * sin(rndAngle)
+    }
+  }
+  longlat <- move(longlat, layers)  #move all records falling on NAs
 
   nPoints = min(1000, sum(!is.na(as.vector(layers[[1]])), na.rm=TRUE)/4)
   bg <- dismo::randomPoints(layers, nPoints)                                ##extract background points
@@ -891,7 +939,8 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @description Single step for prediction of multiple species distributions. Output of maps (in pdf format), klms (for Google Earth) and relevant data (in csv format).
 #' @param longlat data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.
 #' @param layers If NULL analyses are done with environmental layers read from data files of red.setup(). If a Raster* object as defined by package raster, analyses use these.
-#' @param dem RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible.
+#' @param error Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.
+#' @param dem RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible, otherwise it will be 0.
 #' @param pca Number of pca axes for environmental data reduction. If 0 (default) no pca is made.
 #' @param file Name of output csv file with all results. If NULL it is named "Results_All.csv".
 #' @param minmodel Minimum number of occurrence records to perform a maxent model. If 0 (default), the function will perform analyses without modelling any species.
@@ -903,7 +952,7 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @references Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
 #' @references Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 #' @export
-map.easy <- function(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL, minmodel = 0, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
+map.easy <- function(longlat, layers = NULL, error = NULL, dem = NULL, pca = 0, file = NULL, minmodel = 0, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
 
   try(dev.off(), silent=T)
   spNames <- unique(longlat[,1])
@@ -932,6 +981,7 @@ map.easy <- function(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL, m
 
   for(s in 1:nSp){
     spData <- longlat[longlat[,1] == spNames[s], -1]
+    spError <- error[longlat[,1] == spNames[s],]
     thinData <- spData
     if(minmodel > 0){
       if(!file.exists(paste(.libPaths()[[1]], "/dismo/java/maxent.jar", sep=""))){
@@ -951,9 +1001,9 @@ map.easy <- function(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL, m
     }
     if(minmodel > 0 && nrow(thinData) >= minmodel){
       if(testpercentage > 0 && nrow(thinData) >= mintest)
-        p <- map.sdm(thinData, layers, testpercentage = testpercentage, runs = runs, subset = subset)
+        p <- map.sdm(thinData, layers, spError, testpercentage = testpercentage, runs = runs, subset = subset)
       else
-        p <- map.sdm(thinData, layers, testpercentage = 0, runs = runs, subset = subset)
+        p <- map.sdm(thinData, layers, spError, testpercentage = 0, runs = runs, subset = subset)
     } else {
       p <- map.points(spData, layers)
     }
@@ -962,11 +1012,17 @@ map.easy <- function(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL, m
     if(minmodel > 0 && nrow(thinData) >= minmodel){
       kml(p[[1]], paste(toString(spNames[s]), ".kml", sep=""))
       countryList <- countries(p[[1]])
-      elev <- elevation(p[[1]], dem)
+      if(is.null(dem))
+        elev <- 0
+      else
+        elev <- elevation(p[[1]], dem)
     } else {
       kml(spData, paste(toString(spNames[s]), ".kml", sep=""))
       countryList <- countries(spData)
-      elev <- elevation(spData, dem)
+      if(is.null(dem))
+        elev <- 0
+      else
+        elev <- elevation(spData, dem)
     }
 
     if(minmodel > 0 && nrow(thinData) >= minmodel && runs > 0){
@@ -1074,7 +1130,7 @@ eoo <- function(spData){
       vertices <- spData[vertices,]
       area = 0
       for(i in 1:(nrow(vertices)-1))
-        area = area + (vertices[i,1]*vertices[(i+1),2] - vertices[i,2]*vertices[(i+1),1])
+        area = area + (as.numeric(vertices[i,1])*as.numeric(vertices[(i+1),2]) - as.numeric(vertices[i,2])*as.numeric(vertices[(i+1),1]))
       area = abs(area/2000000)
     }
   } else if (ncol(spData) == 2){
@@ -1087,7 +1143,7 @@ eoo <- function(spData){
     } else { #if square data in meters
       area = 0
       for(i in 1:(nrow(vertices)-1))
-        area = area + (vertices[i,1]*vertices[(i+1),2] - vertices[i,2]*vertices[(i+1),1])
+        area = area + (as.numeric(vertices[i,1])*as.numeric(vertices[(i+1),2]) - as.numeric(vertices[i,2])*as.numeric(vertices[(i+1),1]))
       area = abs(area/2000000)
     }
   } else {
@@ -1195,13 +1251,15 @@ countries <- function(spData, ISO = FALSE){
 #' @description Creates kml files for Google Maps as required by IUCN guidelines.
 #' @param spData Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).
 #' @param filename The name of file to save, should end with .kml.
-#' @param minimum If the number of records is lower than the minimum no polygon in drawn, only circles of about 10km radius around each point.
+#' @param minimum If the number of records is lower than the minimum no polygon in drawn, only circles of given radius around each point.
+#' @param radius radius of circles in degrees if the number of records is lower than the minimum.
+#' @return A kml with minimum convex polygon or circles around records.
 #' @export
-kml <- function(spData, filename, minimum = 3){
+kml <- function(spData, filename, minimum = 3, radius = 0.1){
   if(nrow(spData) < minimum){
     poly = list()
     for(i in 1:nrow(spData)){
-      rad = 0.1 # radius
+      rad = radius # radius
       pts = seq(0, 2 * pi, length.out = 100)
       xy = cbind(spData[i, 1] + rad * sin(pts), spData[i, 2] + rad * cos(pts))
       poly[[i]] = Polygon(xy)

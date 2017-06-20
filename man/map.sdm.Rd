@@ -4,13 +4,15 @@
 \alias{map.sdm}
 \title{Predict species distribution.}
 \usage{
-map.sdm(longlat, layers, categorical = NULL, thres = 0,
+map.sdm(longlat, layers, error = NULL, categorical = NULL, thres = 0,
   testpercentage = 0, mcp = TRUE, eval = TRUE, runs = 0, subset = 0)
 }
 \arguments{
 \item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.}
 
 \item{layers}{Predictor variables, a Raster* object as defined by package raster.}
+
+\item{error}{Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.}
 
 \item{categorical}{Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data.}
 

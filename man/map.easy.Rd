@@ -4,16 +4,18 @@
 \alias{map.easy}
 \title{Species distributions made easy (multiple species).}
 \usage{
-map.easy(longlat, layers = NULL, dem = NULL, pca = 0, file = NULL,
-  minmodel = 0, testpercentage = 0, mintest = 20, runs = 0,
-  subset = 0)
+map.easy(longlat, layers = NULL, error = NULL, dem = NULL, pca = 0,
+  file = NULL, minmodel = 0, testpercentage = 0, mintest = 20,
+  runs = 0, subset = 0)
 }
 \arguments{
 \item{longlat}{data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.}
 
 \item{layers}{If NULL analyses are done with environmental layers read from data files of red.setup(). If a Raster* object as defined by package raster, analyses use these.}
 
-\item{dem}{RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible.}
+\item{error}{Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.}
+
+\item{dem}{RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible, otherwise it will be 0.}
 
 \item{pca}{Number of pca axes for environmental data reduction. If 0 (default) no pca is made.}
 

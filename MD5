@@ -1,6 +1,6 @@
-448de7382d11fa6044d770fc0e1307db *DESCRIPTION
-e4df0e4da26e6a85ec2ffd68eee3be2c *NAMESPACE
-e7e2866136bb7da8eab56b5d13a466c2 *R/red.R
+8246860163f9ae62a2d0192a3946d717 *DESCRIPTION
+b153e5ed68c277b9b5ec0e746cf7b717 *NAMESPACE
+231ae15f6e2091919ba959feec0c33f6 *R/red.R
 68cb99455fc72d1b1f08aeb3f87d86e6 *data/red.distribution.rda
 44b670bc8973dc1d3a034e534c40ae52 *data/red.layers.rda
 3b691cb1f77d17f36fecb0db6508d780 *data/red.records.rda
@@ -9,12 +9,13 @@ b54ec70becb185f2227d6be8ff3b6a09 *man/aoo.Rd
 471a3275f992dd84fcca8ef1bec15074 *man/countries.Rd
 d0b9e89daefbac3de1b85acfc12efc71 *man/elevation.Rd
 073b57557254b6b80636f2eb844014cf *man/eoo.Rd
-ec89addc89561c52ddd113d8dfe935fd *man/kml.Rd
+6259cbeeb209541b84173ae9aaf29706 *man/kml.Rd
 23038eac7b6acb016efc1f29254145ee *man/map.draw.Rd
-6280903b48691ad9870995238eab9c81 *man/map.easy.Rd
+c942661627a09b16ffc626f74b3d9a16 *man/map.easy.Rd
 4c44fe5954796f022e21c84cc221897a *man/map.habitat.Rd
 80a4254d3116cb9a92d18e5373bdb32f *man/map.points.Rd
-d136c502a92388bb285a6bb34ac71a68 *man/map.sdm.Rd
+834cf3b334b568c755cd17509656e2dc *man/map.sdm.Rd
+d2de184bf0293b1d7605a81cfef5e736 *man/move.Rd
 6baaeb60a49d9f3eb1168a8b172280ad *man/outliers.Rd
 2c353e4df7d31df2f0d5cd602e353951 *man/raster.clean.Rd
 9eab1de281bfda540bcf7407a052a0a8 *man/raster.east.Rd
