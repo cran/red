@@ -1,11 +1,11 @@
-8246860163f9ae62a2d0192a3946d717 *DESCRIPTION
-b153e5ed68c277b9b5ec0e746cf7b717 *NAMESPACE
-231ae15f6e2091919ba959feec0c33f6 *R/red.R
+75659a352c63a9d3474390152621df8a *DESCRIPTION
+e36c651965fd23363a3c245987b38e3f *NAMESPACE
+cfc3adf1ce08529a51ec142dadc4d935 *R/red.R
 68cb99455fc72d1b1f08aeb3f87d86e6 *data/red.distribution.rda
 44b670bc8973dc1d3a034e534c40ae52 *data/red.layers.rda
 3b691cb1f77d17f36fecb0db6508d780 *data/red.records.rda
 1f64650576632c2c2725224e09242531 *data/worldborders.rda
-b54ec70becb185f2227d6be8ff3b6a09 *man/aoo.Rd
+86764324a93dcf3e381d2edc0b109128 *man/aoo.Rd
 471a3275f992dd84fcca8ef1bec15074 *man/countries.Rd
 d0b9e89daefbac3de1b85acfc12efc71 *man/elevation.Rd
 073b57557254b6b80636f2eb844014cf *man/eoo.Rd

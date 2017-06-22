@@ -16,7 +16,7 @@ A single value in km2.
 Calculates the Area of Occupancy of a species based on either known records or predicted distribution.
 }
 \details{
-AOO is calculated as the area of all known or predicted cells for the species. The resolution will be either exactly (if spData is in meters) or approximately (otherwise) 2x2km as required by IUCN).
+AOO is calculated as the area of all known or predicted cells for the species. The resolution will be 2x2km as required by IUCN.
 }
 \examples{
 data(red.distribution)

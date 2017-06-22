@@ -1,13 +1,11 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.1.0 (2017-06-20)
+#####Version 1.1.1 (2017-06-22)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v1.0.1:
-#####Added function move
-#####Added param error in map.sdm and map.easy
-#####Added param radius in kml
-#####Solved limitations with large integer overflow
+#####Changed from v1.1.0:
+#####Improved function aoo, now always uses 2x2 km squares
+#####Improved function categorical
 
 #Todo:
 # rli*: add trees (for phylogenetic and functional diversity)
@@ -23,8 +21,8 @@
 
 #####RED Stats:
 #####library("cranlogs")
-#####day <- cran_downloads(package = "red", from = "2016-08-19", to = "2017-02-20")
-#####group <- matrix(day$count, 10, byrow = TRUE)
+#####day <- cran_downloads(package = "red", from = "2016-08-19", to = "2017-06-21")
+#####group <- matrix(day$count, 100, byrow = TRUE)
 #####plot(rowSums(group), type = "n")
 #####lines(rowSums(group))
 
@@ -52,13 +50,21 @@ library("utils")
 #' @import utils
 #' @importFrom geosphere areaPolygon
 #' @importFrom grDevices chull dev.copy dev.off pdf
-#' @importFrom raster area cellStats clump crop extent extract getValues layerStats mask raster rasterize rasterToPoints reclassify sampleRandom scalebar terrain trim writeRaster
+#' @importFrom raster area cellStats clump crop extent extract getValues layerStats mask raster rasterize rasterToPoints reclassify res sampleRandom scalebar terrain trim writeRaster
 
 ###############################################################################
 ##############################AUX FUNCTIONS####################################
 ###############################################################################
 
 raster::rasterOptions(maxmemory = 2e+09)
+
+longlat2utm <- function(longlat){
+  longlat = as.matrix(longlat)
+  minlong = min(longlat[,1])
+  zone = floor((minlong + 180) / 6) + 1
+  res = rgdal::project(longlat, paste("+proj=utm +zone=",zone," ellps=WGS84",sep=''))
+  return(res)
+}
 
 ##warn if maxent.jar is not available
 warnMaxent <- function(){
@@ -71,13 +77,13 @@ warnMaxent <- function(){
   http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.html")
 }
 
-##detect which layers are categorical by checking if all values are integers and if the max is less than 100 (may fail, just an attempt)
+##detect which layers are categorical by checking if all values are integers and if the max is less than 50 (may fail, just an attempt)
 find.categorical <- function(layers){
   categorical = c()
   for(l in 1:(dim(layers)[3])){
     lay <- raster::as.matrix(layers[[l]])
     lay[is.na(lay)] <- 0
-    if(sum(as.numeric(lay)) == sum(lay) && max(lay) < 100)
+    if(sum(floor(lay)) == sum(lay) && max(lay) < 50)
       categorical = c(categorical, l)
   }
   return(categorical)
@@ -1155,15 +1161,23 @@ eoo <- function(spData){
 #' Area of Occupancy (AOO).
 #' @description Calculates the Area of Occupancy of a species based on either known records or predicted distribution.
 #' @param spData One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).
-#' @details AOO is calculated as the area of all known or predicted cells for the species. The resolution will be either exactly (if spData is in meters) or approximately (otherwise) 2x2km as required by IUCN).
+#' @details AOO is calculated as the area of all known or predicted cells for the species. The resolution will be 2x2km as required by IUCN.
 #' @return A single value in km2.
 #' @examples data(red.distribution)
 #' aoo(red.distribution)
 #' @export
 aoo <- function(spData){
-  if(class(spData) == "RasterLayer"){ #if rasterlayer with 0/1
+  if (class(spData) == "RasterLayer"){ #if rasterlayer with 0/1
     if (raster::xmax(spData) <= 180) {  #if longlat data
-      area = cellStats((raster::area(spData) * spData), sum)
+      #area = cellStats((raster::area(spData) * spData), sum)          #old version using cell area instead of 2x2 grid
+      if(res(spData)[1] > 0.05)   #if resolution is 10km convert to 2km
+        spData = disaggregate(spData, fact = 5)
+      spData[spData < 1] <- NA
+      spData <- rasterToPoints(spData)
+      spData <- longlat2utm(spData[,-3])
+      spData = floor(spData/2000)
+      ncells = nrow(unique(spData))
+      area = ncells * 4
     } else { #if square data in meters
       spData[spData < 1] <- NA
       spData <- rasterToPoints(spData)
@@ -1173,19 +1187,23 @@ aoo <- function(spData){
     }
   } else if (ncol(spData) == 2){
     if (max(spData) <= 180) {  #if longlat data
-      #layer = raster.read(spData, ext = 0.1)[[1]]
-      gisdir = red.getDir()
-      layer = raster(paste(gisdir, "red_2km_1.tif", sep = ""))
-      spData <- spData[!is.na(extract(layer, spData)),]
-      layer = rasterize(spData, layer, field = 1)
-      area = cellStats((raster::area(layer) * layer), sum)
+      #layer = raster.read(spData, ext = 0.1)[[1]]                     #old version using cell area instead of 2x2 grid
+      #gisdir = red.getDir()
+      #layer = raster(paste(gisdir, "red_2km_1.tif", sep = ""))
+      #spData <- spData[!is.na(extract(layer, spData)),]
+      #layer = rasterize(spData, layer, field = 1)
+      #area = cellStats((raster::area(layer) * layer), sum)
+      spData <- longlat2utm(spData)
+      spData = floor(spData/2000)
+      ncells = nrow(unique(spData))
+      area = ncells * 4
     } else { #if square data in meters
       spData = floor(spData/2000)
       ncells = nrow(unique(spData))
       area = ncells * 4
     }
   } else {
-    return(warning("Data format not recognized"))
+    return(warning("Data format not recognized!"))
   }
   return(area)
 }
