@@ -20,7 +20,7 @@ A RasterStack object (If no layers are given: Variables 1-19 = bioclim, 20 = ele
 Read raster layers of environmental or other variables and crop them to a given extent around the known occurrences.
 }
 \details{
-If layers are not given, the function will read either 1 arc-minute (approx. 2km) or 5 arc-minutes (approx. 10km) resolution rasters from worldclim (Hijmans et al. 2005) and landcover (Tuanmu & Jetz 2014) if red.setup() is run previously.
+If layers are not given, the function will read either 30 arc-second (approx. 1km) or 5 arc-minutes (approx. 10km) resolution rasters from worldclim (Fick & Hijmans 2017) and landcover (Tuanmu & Jetz 2014) if red.setup() is run previously.
 }
 \examples{
 data(red.layers)
@@ -31,4 +31,9 @@ points(red.records)
 croppedLayers <- raster.read(red.records, red.layers, 0.1)
 raster::plot(croppedLayers[[1]])
 points(red.records)
+}
+\references{
+Fick, S.E. & Hijmans, R.J. (2017) Worldclim 2: new 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology, in press.
+
+Tuanmu, M.-N. & Jetz, W. (2014) A global 1-km consensus land-cover product for biodiversity and ecosystem modeling. Global Ecology and Biogeography, 23: 1031-1045.
 }

@@ -31,7 +31,7 @@ Creates maps ready to print in pdf or other formats.
 }
 \examples{
 data(red.records)
-data(red.distribution)
+data(red.range)
 par(mfrow = c(1,2))
-map.draw(red.records, layer = red.distribution, mcp = TRUE)
+map.draw(red.records, layer = red.range, mcp = TRUE)
 }

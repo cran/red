@@ -12,7 +12,7 @@ map.sdm(longlat, layers, error = NULL, categorical = NULL, thres = 0,
 
 \item{layers}{Predictor variables, a Raster* object as defined by package raster.}
 
-\item{error}{Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.}
+\item{error}{Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.}
 
 \item{categorical}{Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data.}
 
@@ -35,12 +35,12 @@ List with either one or two raster objects (depending if ensemble modelling is p
 Prediction of potential species distributions using maximum entropy (maxent).
 }
 \details{
-Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2016). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from https://www.cs.princeton.edu/~schapire/maxent/. Copy the file 'maxent.jar' into the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
+Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2017). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from https://www.cs.princeton.edu/~schapire/maxent/. Copy the file 'maxent.jar' into the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
 }
 \references{
 Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
 
-Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2016) dismo: Species Distribution Modeling. R package version 1.0-15. https://CRAN.R-project.org/package=dismo
+Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2017) dismo: Species Distribution Modeling. R package version 1.1-4. https://CRAN.R-project.org/package=dismo
 
 Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 

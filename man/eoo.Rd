@@ -20,7 +20,7 @@ EOO is calculated as the minimum convex polygon covering all known or predicted 
 }
 \examples{
 data(red.records)
-data(red.distribution)
+data(red.range)
 eoo(red.records)
-eoo(red.distribution)
+eoo(red.range)
 }

@@ -19,6 +19,6 @@ Calculates the Area of Occupancy of a species based on either known records or p
 AOO is calculated as the area of all known or predicted cells for the species. The resolution will be 2x2km as required by IUCN.
 }
 \examples{
-data(red.distribution)
-aoo(red.distribution)
+data(red.range)
+aoo(red.range)
 }

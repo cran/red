@@ -1,11 +1,14 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.1.1 (2017-06-22)
+#####Version 1.2.0 (2017-07-27)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v1.1.0:
-#####Improved function aoo, now always uses 2x2 km squares
-#####Improved function categorical
+#####Changed from v1.1.1:
+#####Now working with worldclim 2 and 1km rasters instead of 2km.
+#####Improved functions kml and countries to work with utm data and kml now allows exporting points, eoo or aoo
+#####Improved map.habitat and map.easy to move records outside habitat patches or environmental layers to closest cell with data.
+#####Improved output of map.easy, map.draw and kml
+#####New example datasets included
 
 #Todo:
 # rli*: add trees (for phylogenetic and functional diversity)
@@ -15,7 +18,7 @@
 # kbas: implement
 
 #####data origins:
-#####climate -> Hijmans, R.J., Cameron, S.E, Parra, J.L., Jones, P.G. & Jarvis A. (2005) Very high resolution interpolated climate surfaces for global land areas. International Journal of Climatology, 25: 1965-1978.
+#####climate -> Fick, S.E. & Hijmans, R.J. (2017) Worldclim 2: new 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology, in press.
 #####altitude -> Farr, T. G., et al. (2007), The Shuttle Radar Topography Mission, Rev. Geophys., 45, RG2004
 #####landcover -> Tuanmu, M.-N. & Jetz, W. (2014) A global 1-km consensus land-cover product for biodiversity and ecosystem modeling. Global Ecology and Biogeography, 23: 1031-1045.
 
@@ -50,7 +53,7 @@ library("utils")
 #' @import utils
 #' @importFrom geosphere areaPolygon
 #' @importFrom grDevices chull dev.copy dev.off pdf
-#' @importFrom raster area cellStats clump crop extent extract getValues layerStats mask raster rasterize rasterToPoints reclassify res sampleRandom scalebar terrain trim writeRaster
+#' @importFrom raster area cellStats clump crop extent extract getValues layerStats mask raster rasterize rasterToPoints rasterToPolygons reclassify res sampleRandom scalebar terrain trim writeRaster xmax xmin
 
 ###############################################################################
 ##############################AUX FUNCTIONS####################################
@@ -66,11 +69,23 @@ longlat2utm <- function(longlat){
   return(res)
 }
 
+utm2longlat <- function(utm, zone){
+  if(class(utm) == "RasterLayer"){
+    if(!is.null(zone))
+      raster::crs(utm) <- paste("+proj=utm +zone=", zone, sep="")
+    res <- raster::projectRaster(utm, crs = "+proj=longlat +datum=WGS84", method='ngb')
+  } else {
+    utm <- SpatialPoints(utm, CRS(paste("+proj=utm +zone=", zone,sep="")))
+    res <- as.data.frame(spTransform(utm,CRS(paste("+proj=longlat"))))
+  }
+  return(res)
+}
+
 ##warn if maxent.jar is not available
 warnMaxent <- function(){
   warning("RED could not find maxent.jar.
   1. Download the latest version of maxent from:
-  https://www.cs.princeton.edu/~schapire/maxent/
+  https://biodiversityinformatics.amnh.org/open_source/maxent/
   2. Move the file maxent.jar to the java directory inside dismo package
   (there should be a file named dismo.jar already there)
   3. Install the latest version of java runtime environment (JRE) with the same architecture (32 or 64 bits) as your version of R:
@@ -167,15 +182,14 @@ red.getDir <- function(){
 
 #' Download and setup GIS files.
 #' @description Setup red to work with species distribution modelling and layers available online.
-#' @details Please check that you have at least 20Gb free in your disk (and a fast internet connection) to download all files. In the end of the process "only" 3Gb will be left though. This function will:
+#' @details Please check that you have at least 50Gb free in your disk (and a fast internet connection) to download all files. In the end of the process "only" 17.4Gb will be left though. This function will:
 #' 1. Check if maxent.jar is available in the dismo package directory.
 #' 2. Ask user input for GIS directory.
-#' 3. Download global bioclim and elevation files (20) from http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/.
+#' 3. Download global bioclim and elevation files (20) from http://biogeo.ucdavis.edu/data/worldclim/v2.0/tif/base/wc2.0_30s_bio.zip.
 #' 4. Download landcover files (12) from http://data.earthenv.org/consensus_landcover/without_DISCover/.
 #' 5. Unzip all files and delete the originals.
 #' 6. Create a new layer (1) with the dominant land cover at each cell.
-#' 7. Resample all files (33) to approximately 2x2km (as required by IUCN) and 10x10km (for use with widespread species) grid cells.
-#' 8. Delete the 1x1km files.
+#' 7. Resample all files (33) to approximately 10x10km (for use with widespread species) grid cells.
 #' Sit back and enjoy, this should take a while.
 #' @export
 red.setup <- function(){
@@ -186,98 +200,88 @@ red.setup <- function(){
     return()
   }
 
-  red.setDir()
-  gisdir = red.getDir()
+  oldwd = getwd()
+  gisdir = red.setDir()
+  setwd(gisdir)
 
   ##basic setup
   pb <- txtProgressBar(min = 0, max = 33, style = 3)
 
-  ##download and process bioclim 1-9
-  download.file("http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/bio1-9_30s_bil.zip", paste(gisdir, "bio1-9_30s_bil.zip", sep=""))
-  unzip(zipfile = paste(gisdir, "bio1-9_30s_bil.zip", sep=""), exdir = "gis")
-  file.remove(paste(gisdir, "bio1-9_30s_bil.zip", sep=""))
-  for(i in 1:9){
+  ##download and process bioclim
+  download.file("http://biogeo.ucdavis.edu/data/worldclim/v2.0/tif/base/wc2.0_30s_bio.zip", "bioclim2.zip")
+  unzip(zipfile = "bioclim.zip")
+  file.remove("bioclim.zip")
+  for(i in 1:19){
     setTxtProgressBar(pb, i)
-    rast <- raster(paste(gisdir, "bio_", i, ".bil", sep=""))
+    if(i < 10)
+      rast <- raster(paste("wc2.0_bio_30s_0", i, ".tif", sep=""))
+    else
+      rast <- raster(paste("wc2.0_bio_30s_", i, ".tif", sep=""))
     rast <- crop(rast, c(-180, 180, -56, 90))
-    rast2 <- aggregate(rast, 2)
-    writeRaster(rast2, paste(gisdir, "red_2km_", i, ".tif", sep=""))
-    rast10 <- aggregate(rast, 10)
-    writeRaster(rast10, paste(gisdir, "red_10km_", i, ".tif", sep=""))
-    file.remove(paste(gisdir, "bio_", i, ".bil", sep=""))
-    file.remove(paste(gisdir, "bio_", i, ".hdr", sep=""))
-    gc()
-  }
-
-  ##download and process bioclim 10-19
-  download.file("http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/bio10-19_30s_bil.zip", paste(gisdir, "bio10-19_30s_bil.zip", sep = ""))
-  unzip(zipfile = paste(gisdir, "bio10-19_30s_bil.zip", sep=""), exdir = "gis")
-  file.remove(paste(gisdir, "bio10-19_30s_bil.zip", sep = ""))
-  for(i in 10:19){
-    setTxtProgressBar(pb, i)
-    rast <- raster(paste(gisdir, "bio_", i, ".bil", sep=""))
-    rast <- crop(rast, c(-180, 180, -56, 90))
-    rast2 <- aggregate(rast, 2)
-    writeRaster(rast2, paste(gisdir, "red_2km_", i, ".tif", sep=""))
-    rast10 <- aggregate(rast, 10)
-    writeRaster(rast10, paste(gisdir, "red_10km_", i, ".tif", sep=""))
-    file.remove(paste(gisdir, "bio_", i, ".bil", sep=""))
-    file.remove(paste(gisdir, "bio_", i, ".hdr", sep=""))
+    writeRaster(rast, paste("red_1km_", i, ".tif", sep=""))
+    rast <- aggregate(rast, 10)
+    writeRaster(rast, paste("red_10km_", i, ".tif", sep=""))
+    if(i < 10)
+      file.remove(paste("wc2.0_bio_30s_0", i, ".tif", sep=""))
+    else
+      file.remove(paste("wc2.0_bio_30s_", i, ".tif", sep=""))
     gc()
   }
 
   ##download and process altitude
   setTxtProgressBar(pb, 20)
-  download.file("http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/alt_30s_bil.zip", paste(gisdir, "alt_30s_bil.zip", sep=""))
-  unzip(zipfile = paste(gisdir, "alt_30s_bil.zip", sep=""), exdir = "gis")
-  file.remove(paste(gisdir, "alt_30s_bil.zip", sep = ""))
-  rast <- raster(paste(gisdir, "alt.bil", sep = ""))
+  download.file("http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/alt_30s_bil.zip", "alt_30s_bil.zip")
+  unzip(zipfile = "alt_30s_bil.zip")
+  file.remove("alt_30s_bil.zip")
+  rast <- raster("alt.bil")
   rast <- crop(rast, c(-180, 180, -56, 90))
-  rast2 <- aggregate(rast, 2)
-  writeRaster(rast2, paste(gisdir, "red_2km_20.tif", sep = ""))
-  rast10 <- aggregate(rast, 10)
-  writeRaster(rast10, paste(gisdir, "red_10km_20.tif", sep = ""))
-  file.remove(paste(gisdir, "alt.bil", sep = ""))
-  file.remove(paste(gisdir, "alt.hdr", sep = ""))
+  writeRaster(rast, "red_1km_20.tif")
+  rast <- aggregate(rast, 10)
+  writeRaster(rast, "red_10km_20.tif")
+  file.remove("alt.bil")
+  file.remove("alt.hdr")
   gc()
 
   ##download and process land cover
-  max2 <- raster::stack()
-  max10 <- raster::stack()
-  altmask = raster(paste(gisdir, "red_2km_20.tif", sep = ""))
-  for(i in 7:12){
+  altmask1 = raster("red_1km_20.tif")
+  altmask10 =  raster("red_10km_20.tif")
+  for(i in 5:12){
     setTxtProgressBar(pb, (i+20))
-    download.file(paste("http://data.earthenv.org/consensus_landcover/without_DISCover/Consensus_reduced_class_", i, ".tif", sep=""), destfile = paste(gisdir, "Consensus_reduced_class_", i, ".tif", sep=""), mode = "wb")
-    rast <- raster(paste(gisdir, "Consensus_reduced_class_", i, ".tif", sep=""))
-    rast2 <- aggregate(rast, 2)
-    maskLayer <- sum(altmask, rast2)
-    maskLayer[!is.na(maskLayer)] <- 1
-    rast2 <- mask(rast2, maskLayer)
-    writeRaster(rast2, paste(gisdir, "red_2km_", (i+20), ".tif", sep=""))
-    rast10 <- aggregate(rast, 10)
-    maskLayer <- sum(altmask, rast10)
-    maskLayer[!is.na(maskLayer)] <- 1
-    rast10 <- mask(rast10, maskLayer)
-    writeRaster(rast10, paste(gisdir, "red_10km_", (i+20), ".tif", sep=""))
-    file.remove(paste(gisdir, "Consensus_reduced_class_", i, ".tif", sep=""))
-    ##write stack for later use of maxStack
-    max2 <- raster::stack(max2, rast2)
-    max10 <- raster::stack(max10, rast10)
+    download.file(paste("http://data.earthenv.org/consensus_landcover/without_DISCover/Consensus_reduced_class_", i, ".tif", sep=""), destfile = paste("Consensus_reduced_class_", i, ".tif", sep=""), mode = "wb")
+    rast <- raster(paste("Consensus_reduced_class_", i, ".tif", sep=""))
+    rast <- mask(rast, altmask1)
+    writeRaster(rast, paste("red_1km_", (i+20), ".tif", sep=""))
+    rast <- aggregate(rast, 10)
+    #maskLayer <- sum(altmask, rast)
+    #maskLayer[!is.na(maskLayer)] <- 1
+    rast <- mask(rast, altmask10)
+    writeRaster(rast, paste("red_10km_", (i+20), ".tif", sep=""))
+    file.remove(paste("Consensus_reduced_class_", i, ".tif", sep=""))
     gc()
   }
-  remove(rast, rast2, rast10)
+  remove(rast)
 
   ##create new rasters with most common landcover at each cell
   setTxtProgressBar(pb, 33)
-  max2 <- which.max(max2)
-  writeRaster(max2, paste(gisdir, "red_2km_33.tif", sep = ""))
+  max1 <- raster()
+  max10 <- raster()
+  for(i in 21:32){
+    rast <- raster(paste("red_1km_", i, ".tif", sep=""))
+    max1 <- raster::stack(max1, rast)
+    rast <- raster(paste("red_10km_", i, ".tif", sep=""))
+    max10 <- raster::stack(max10, rast)
+  }
+  max1 <- which.max(max1)
+  writeRaster(max1, "red_1km_33.tif")
   max10 <- which.max(max10)
-  writeRaster(max10, paste(gisdir, "red_10km_33.tif", sep = ""))
-  remove(max2, max10)
+  writeRaster(max10, "red_10km_33.tif")
+  remove(max1, max10)
   gc()
+  setwd(oldwd)
+
 
   ##Now the files should be named as:
-  ##red_2km_1.tif
+  ##red_1km_1.tif
   ##...
   ##red_10km_33.tif
   ##Where 1 to 19 are the corresponding bioclim variables, 20 is altitude, 21 to 32 are landcover proportion and 33 is most common landcover per cell
@@ -434,8 +438,10 @@ thin <- function(longlat, distance = 0.01, relative = TRUE, runs = 100){
 #' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.
 #' @param layers Raster* object as defined by package raster.
 #' @param ext Either extent of map or buffer around the known records used to crop layers. If buffer, it is relative to the maximum distance between any two records.
-#' @details If layers are not given, the function will read either 1 arc-minute (approx. 2km) or 5 arc-minutes (approx. 10km) resolution rasters from worldclim (Hijmans et al. 2005) and landcover (Tuanmu & Jetz 2014) if red.setup() is run previously.
+#' @details If layers are not given, the function will read either 30 arc-second (approx. 1km) or 5 arc-minutes (approx. 10km) resolution rasters from worldclim (Fick & Hijmans 2017) and landcover (Tuanmu & Jetz 2014) if red.setup() is run previously.
 #' @return A RasterStack object (If no layers are given: Variables 1-19 = bioclim, 20 = elevation, 21-32 = proportion landcover, 33 = most common landcover).
+#' @references Fick, S.E. & Hijmans, R.J. (2017) Worldclim 2: new 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology, in press.
+#' @references Tuanmu, M.-N. & Jetz, W. (2014) A global 1-km consensus land-cover product for biodiversity and ecosystem modeling. Global Ecology and Biogeography, 23: 1031-1045.
 #' @examples data(red.layers)
 #' data(red.records)
 #' par(mfrow=c(1,2))
@@ -458,10 +464,10 @@ raster.read <- function(longlat, layers = NULL, ext = 1){
     gisdir = red.getDir()
 
     ##calculate species range and buffer around it
-    if((xlen * ylen) < 2){
-      layers <- raster::stack(raster::raster(paste(gisdir, "red_2km_1.tif", sep = "")))
+    if(eoo(longlat) < 200000){
+      layers <- raster::stack(raster::raster(paste(gisdir, "red_1km_1.tif", sep = "")))
       for(i in 2:33)
-        layers <- raster::stack(layers, raster::raster(paste(gisdir, "red_2km_", i, ".tif", sep = "")))
+        layers <- raster::stack(layers, raster::raster(paste(gisdir, "red_1km_", i, ".tif", sep = "")))
     } else {
       layers <- raster::stack(raster::raster(paste(gisdir, "red_10km_1.tif", sep = "")))
       for(i in 2:33)
@@ -498,7 +504,8 @@ raster.read <- function(longlat, layers = NULL, ext = 1){
   xmax <- min(raster::extent(layers)@xmax, xmax+ext)
   ymin <- max(raster::extent(layers)@ymin, ymin-ext)
   ymax <- min(raster::extent(layers)@ymax, ymax+ext)
-  return(crop(layers, c(xmin,xmax,ymin,ymax)))
+  layers <- crop(layers, c(xmin,xmax,ymin,ymax))
+  return(layers)
 }
 
 #' Uniformize raster layers.
@@ -640,7 +647,7 @@ raster.north <- function(dem){
 #' @description Prediction of potential species distributions using maximum entropy (maxent).
 #' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.
 #' @param layers Predictor variables, a Raster* object as defined by package raster.
-#' @param error Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.
+#' @param error Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.
 #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data.
 #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 0 this will be the value that maximizes the sum of sensitivity and specificity.
 #' @param testpercentage Percentage of records used for testing only. If 0 all records will be used for both training and testing.
@@ -648,10 +655,10 @@ raster.north <- function(dem){
 #' @param eval If TRUE, build a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.
 #' @param subset Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs. Using a small number of layers is usually better than using many variables for rare species, with few occurrence records (Lomba et al. 2010, Breiner et al. 2015).
-#' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2016). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from https://www.cs.princeton.edu/~schapire/maxent/. Copy the file 'maxent.jar' into the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
+#' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2017). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from https://www.cs.princeton.edu/~schapire/maxent/. Copy the file 'maxent.jar' into the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
 #' @return List with either one or two raster objects (depending if ensemble modelling is performed, in which case the second is a probabilistic map from all the runs) and, if eval = TRUE, a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model). Aggregate values are taken from maps after transformation of probabilities to incidence, with presence predicted for cells with ensemble values > 0.5.
 #' @references Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
-#' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2016) dismo: Species Distribution Modeling. R package version 1.0-15. https://CRAN.R-project.org/package=dismo
+#' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2017) dismo: Species Distribution Modeling. R package version 1.1-4. https://CRAN.R-project.org/package=dismo
 #' @references Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 #' @references Phillips, S.J., Dudik, M., Schapire, R.E. (2004) A maximum entropy approach to species distribution modeling. Proceedings of the Twenty-First International Conference on Machine Learning. p. 655-662.
 #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling, 190: 231-259.
@@ -690,6 +697,9 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
     upMap <- reclassify(runMap, matrix(c(0,0.025,0,0.025,1,1), ncol = 3, byrow = TRUE))
     consensusMap <- reclassify(runMap, matrix(c(0,0.499,0,0.499,1,1), ncol = 3, byrow = TRUE))
     downMap <- reclassify(runMap, matrix(c(0,0.975,0,0.975,1,1), ncol = 3, byrow = TRUE))
+    if(mcp && aoo(consensusMap) >= 4)
+      consensusMap <- map.habitat(longlat, consensusMap, mcp = TRUE, eval = FALSE)
+
     if(eval){
       runEval <- runEval[-1,]
       clEval <- matrix(NA, nrow = 3, ncol = 7)
@@ -746,7 +756,7 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
     thres <- dismo::threshold(e)$spec_sens                                   ##extract threshold from evaluation
   p <- reclassify(p, matrix(c(0,thres,0,thres,1,1), nrow=2, byrow = TRUE))  ##convert to presence/absence
 
-  if(mcp)
+  if(mcp && aoo(p) >= 4)
     p <- map.habitat(longlat, p, mcp = TRUE, eval = FALSE)
 
   if(eval){
@@ -759,7 +769,7 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
     eooRaw <- eoo(longlat)
     aooRaw <- aoo(longlat)
     aooModel <- aoo(p)
-    if(aooModel > 6)
+    if(aooModel > 8)
       eooModel <- eoo(p)
     else
       eooModel = aooModel
@@ -775,12 +785,20 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
 #' @description Mapping of all habitat patches where the species is known to occur.
 #' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.
 #' @param layer RasterLayer object representing the presence/absence (1/0) of a single habitat type.
+#' @param move If TRUE, identifies and moves presence records to closest cells with suitable habitat. Use when spatial error might put records outside the correct patch.
 #' @param mcp If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.
 #' @param eval If TRUE, build a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @details In many cases a species has a very restricted habitat and we generally know where it occurs. In such cases using the distribution of the known habitat patches may be enough to map the species.
 #' @return One raster object and, if eval = TRUE, a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @export
-map.habitat <- function(longlat, layer, mcp = FALSE, eval = TRUE){
+map.habitat <- function(longlat, layer, move = TRUE, mcp = FALSE, eval = TRUE){
+  if(move){
+    moveLayer <- layer
+    moveLayer[moveLayer == 0] <- NA
+    longlat <- move(longlat, moveLayer)
+    remove(moveLayer)
+  }
+
   if(mcp){
     vertices <- chull(longlat)
     vertices <- c(vertices, vertices[1])
@@ -853,9 +871,9 @@ map.points <- function(longlat, layers, eval = TRUE){
 ## #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 1 this will be the value that maximizes the sum of sensitivity and specificity.
 ## #' @param polygon Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Only cells connected to other areas inside the polygon are kept for both present and future projections.
 ## #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run a bootstrap (random sampling with replacement) of all occurrence records and a new set of 1000 background points are chosen.
-## #' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2016) for both the present and future.
+## #' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2017) for both the present and future.
 ## #' @return Either three or six RasterLayer (depending if ensemble modelling is performed, in which case the second trio are probabilistic maps from all the runs) and a matrix with Present AOO, Future AOO, Gain, Keep and Loss.
-## #' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2016) dismo: Species Distribution Modeling. R package version 1.0-15. https://CRAN.R-project.org/package=dismo
+## #' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2017) dismo: Species Distribution Modeling. R package version 1.1-4. https://CRAN.R-project.org/package=dismo
 ## #' @references Phillips, S.J., Dudik, M., Schapire, R.E. (2004) A maximum entropy approach to species distribution modeling. Proceedings of the Twenty-First International Conference on Machine Learning. p. 655-662.
 ## #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling 190:231-259.
 ## #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions 17:43-57.
@@ -945,11 +963,14 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @description Single step for prediction of multiple species distributions. Output of maps (in pdf format), klms (for Google Earth) and relevant data (in csv format).
 #' @param longlat data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.
 #' @param layers If NULL analyses are done with environmental layers read from data files of red.setup(). If a Raster* object as defined by package raster, analyses use these.
-#' @param error Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.
+#' @param habitat Raster* object as defined by package raster. Habitat extent layer (0/1) used instead of layers if any species is an habitat specialist.
+#' @param zone UTM zone if data is in metric units. Used only for correct placement of kmls and countries.
+#' @param error Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.
+#' @param move If TRUE, identifies and moves presence records to closest cells with environmental data. Use when spatial error might put records outside such data.
 #' @param dem RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible, otherwise it will be 0.
 #' @param pca Number of pca axes for environmental data reduction. If 0 (default) no pca is made.
-#' @param file Name of output csv file with all results. If NULL it is named "Results_All.csv".
-#' @param minmodel Minimum number of occurrence records to perform a maxent model. If 0 (default), the function will perform analyses without modelling any species.
+#' @param filename Name of output csv file with all results. If NULL it is named "Results_All.csv".
+#' @param mapoption Vector of values within options: points, habitat and sdm; each value corresponding to the function to be used for each species (map.points, map.habitat, map.sdm). If a single value, all species will be modelled according to it. If NULL, the function will perform analyses using map.points. Species values must be in same order as latlong.
 #' @param testpercentage Percentage of records used for testing only. If 0 all records will be used for both training and testing.
 #' @param mintest Minimim number of total occurrence records of any species to set aside a test set. Only used if testpercentage > 0.
 #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.
@@ -958,16 +979,30 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @references Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
 #' @references Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 #' @export
-map.easy <- function(longlat, layers = NULL, error = NULL, dem = NULL, pca = 0, file = NULL, minmodel = 0, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
+map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
 
   try(dev.off(), silent=T)
   spNames <- unique(longlat[,1])
   nSp <- length(spNames)
 
-  if (minmodel <= 0){
+  if(is.null(mapoption))
+    mapoption = rep("points", nSp)
+  else if(length(mapoption) == 1)
+    mapoption = rep(mapoption, nSp)
+  else if(length(mapoption) != nSp)
+    return(warning("Number of species different from length of mapoption"))
+
+  if("sdm" %in% mapoption){
+    if(!file.exists(paste(.libPaths()[[1]], "/dismo/java/maxent.jar", sep=""))){
+      warnMaxent()
+      return()
+    }
+  }
+
+  if (all(mapoption == rep("points", nSp))){
     res <- matrix(NA, nrow = nSp, ncol = 5)
     colnames(res) <- c("EOO", "AOO", "Min elevation", "Max elevation", "Countries")
-  } else if (runs > 0) {
+  } else if (("sdm" %in% mapoption) && runs > 0) {
     res <- matrix(NA, nrow = nSp, ncol = 11)
     colnames(res) <- c("EOO (raw)", "EOO (LowCL)", "EOO (Consensus)", "EOO (UpCL)", "AOO (raw)", "AOO (LowCL)", "AOO (Consensus)", "AOO (UpCL)", "Min elevation", "Max elevation", "Countries")
   } else {
@@ -985,82 +1020,98 @@ map.easy <- function(longlat, layers = NULL, error = NULL, dem = NULL, pca = 0, 
   else
     newDem <- FALSE
 
+  rad = 0.1
   for(s in 1:nSp){
+    cat("\nSpecies", s, "of", nSp, "-", toString(spNames[s]),"\n")
     spData <- longlat[longlat[,1] == spNames[s], -1]
-    spError <- error[longlat[,1] == spNames[s],]
-    thinData <- spData
-    if(minmodel > 0){
-      if(!file.exists(paste(.libPaths()[[1]], "/dismo/java/maxent.jar", sep=""))){
-        warnMaxent()
-        return()
-      }
-      thinData <- thin(spData)
+    if(!is.null(error)){
+      spError <- error[longlat[,1] == spNames[s]]
+      if(max(spError) > 1)
+        rad <- spError/100000
+      else
+        rad <- spError
+    } else {
+      spError <- NULL
     }
-    cat("\nSpecies", s, "of", nSp, "-", toString(spNames[s]), "\n")
     if(newLayers){
       layers <- raster.read(spData)
       if(newDem)
         dem <- layers[[20]]
       if(pca > 0)
         layers <- raster.reduce(layers, n = pca)
-      layers <- raster::stack(layers, raster.long(layers[[1]]), raster.lat(layers[[1]]))
     }
-    if(minmodel > 0 && nrow(thinData) >= minmodel){
-      if(testpercentage > 0 && nrow(thinData) >= mintest)
-        p <- map.sdm(thinData, layers, spError, testpercentage = testpercentage, runs = runs, subset = subset)
+
+    if(mapoption[s]  == "sdm" && aoo(move(spData, layers)) > 8){
+      if(move)
+        spData <- move(spData, layers)
+      if(testpercentage > 0)
+        p <- map.sdm(spData, layers, spError, testpercentage = testpercentage, mcp = TRUE, runs = runs, subset = subset)
       else
-        p <- map.sdm(thinData, layers, spError, testpercentage = 0, runs = runs, subset = subset)
+        p <- map.sdm(spData, layers, spError, testpercentage = 0, mcp = TRUE, runs = runs, subset = subset)
+    } else if (mapoption[s] == "habitat"){
+      p <- map.habitat(spData, habitat, move)
     } else {
+      mapoption[s] = "points"
       p <- map.points(spData, layers)
     }
     writeRaster(p[[1]], paste(toString(spNames[s]), ".asc", sep=""), overwrite = TRUE)
     map.draw(spData, p[[1]], spNames[s], sites = FALSE, print = TRUE)
-    if(minmodel > 0 && nrow(thinData) >= minmodel){
-      kml(p[[1]], paste(toString(spNames[s]), ".kml", sep=""))
-      countryList <- countries(p[[1]])
+    if(mapoption[s] != "points"){
+      kml(p[[1]], zone = zone, paste(toString(spNames[s]), ".kml", sep=""), mapoption = "aoo")
+      countryList <- countries(p[[1]], zone = zone)
       if(is.null(dem))
-        elev <- 0
+        elev <- c(0, 0)
       else
         elev <- elevation(p[[1]], dem)
     } else {
-      kml(spData, paste(toString(spNames[s]), ".kml", sep=""))
-      countryList <- countries(spData)
+      kml(spData, zone = zone, paste(toString(spNames[s]), ".kml", sep=""), mapoption = "points", rad = rad)
+      countryList <- countries(spData, zone = zone)
       if(is.null(dem))
-        elev <- 0
+        elev <- c(0, 0)
       else
         elev <- elevation(spData, dem)
     }
 
-    if(minmodel > 0 && nrow(thinData) >= minmodel && runs > 0){
+    if(mapoption[s]  == "sdm" && aoo(spData) > 8 && runs > 0){
       writeRaster(p[[2]], paste(toString(spNames[s]), "_prob.asc", sep=""), overwrite = TRUE)
       map.draw(spData, p[[2]], paste(toString(spNames[s]), "_prob", sep = ""), legend = TRUE, print = TRUE)
     }
 
-    ##write output values to both screen and csv
+    ##write output values to csv
     spRes = p[[length(p)]]
     if(ncol(res) == 5){      #colnames(res) <- c("EOO", "AOO", "Min elevation", "Max elevation", "Countries")
       res[s,] <- c(spRes, elev, toString(countryList))
     }
     if(ncol(res) == 7){      #colnames(res) <- c("EOO (raw)", "EOO (model)", "AOO (raw)", "AOO (model)", "Min elevation", "Max elevation", "Countries")
-      if(length(spRes) == 2)
-        res[s,] <- c(spRes[c(1,1,2,2)], elev, toString(countryList))
-      else  #if length(spRes) == 7
+      if(length(spRes) == 7)
         res[s,] <- c(spRes[4:7], elev, toString(countryList))
+      else  #if length(spRes) < 7
+        res[s,] <- c(spRes[c(1,1,2,2)], elev, toString(countryList))
     }
     if(ncol(res) == 11){     #colnames(res) <- c("EOO (raw)", "EOO (LowCL)", "EOO (Consensus)", "EOO (UpCL)", "AOO (raw)", "AOO (LowCL)", "AOO (Consensus)", "AOO (UpCL)", "Min elevation", "Max elevation", "Countries")
       if(length(spRes) == 2)
         res[s,] <- c(spRes[c(1,1,1,1,2,2,2,2)], elev, toString(countryList))
+      else if(length(spRes) == 4)
+        res[s,] <- c(spRes[c(1,2,2,2,3,4,4,4)], elev, toString(countryList))
       else if(is.null(dim(spRes)))
         res[s,] <- c(spRes[4:7], elev, toString(countryList))
       else   #if matrix
         res[s,] <- c(spRes[2,4], spRes[3:1,5], spRes[2,6], spRes[3:1,7], elev, toString(countryList))
     }
     write.csv(res[s,], paste(toString(spNames[s]), ".csv", sep = ""))
+    if(mapoption[s]  == "sdm" && aoo(spData) > 8){
+      if(runs > 0)
+        write.csv(p[[3]], paste(toString(spNames[s]), "_detail.csv", sep = ""))
+      else
+        write.csv(p[[2]], paste(toString(spNames[s]), "_detail.csv", sep = ""))
+    }
+
+
   }
-  if(is.null(file))
+  if(is.null(filename))
     write.csv(res, "Results_All.csv")
   else
-    write.csv(res, toString(file))
+    write.csv(res, toString(filename))
   return(as.data.frame(res))
 }
 
@@ -1076,22 +1127,25 @@ map.easy <- function(longlat, layers = NULL, error = NULL, dem = NULL, pca = 0, 
 #' @param mcp If TRUE the minimum convex polygon representing the Extent of Occurrence is drawn.
 #' @param print If TRUE a pdf is saved instead of the output to the console.
 #' @examples data(red.records)
-#' data(red.distribution)
+#' data(red.range)
 #' par(mfrow = c(1,2))
-#' map.draw(red.records, layer = red.distribution, mcp = TRUE)
+#' map.draw(red.records, layer = red.range, mcp = TRUE)
 #' @export
 map.draw <- function(longlat = NULL, layer, spName,  borders = FALSE, scale = TRUE, legend = FALSE, sites = TRUE, mcp = FALSE, print = FALSE){
   worldborders <- NULL
   data(worldborders, envir = environment())
   if (borders){
     layer[layer == 0] <- NA
-    raster::plot(layer, main = toString(spName), legend = legend, xlab = "longitude", ylab = "latitude", col = "forestgreen")
+    raster::plot(layer, main = spName, legend = legend, xlab = "longitude", ylab = "latitude", col = "forestgreen")
     lines(worldborders)
   } else {
     raster::plot(layer, main = spName, legend = legend, colNA = "lightblue", xlab = "longitude", ylab = "latitude")
   }
-  if (scale)
-    scalebar(type="bar", divs = 2)
+  if (scale){
+    width = (xmax(layer) - xmin(layer))
+    d = round(width/10^(nchar(width)-1))*10^(nchar(width)-2)
+    scalebar(d = d, type="bar", divs = 2)
+  }
   if (sites && !is.null(longlat))
     points(longlat)
   if (mcp){
@@ -1114,9 +1168,9 @@ map.draw <- function(longlat = NULL, layer, spName,  borders = FALSE, scale = TR
 #' @details EOO is calculated as the minimum convex polygon covering all known or predicted sites for the species.
 #' @return A single value in km2.
 #' @examples data(red.records)
-#' data(red.distribution)
+#' data(red.range)
 #' eoo(red.records)
-#' eoo(red.distribution)
+#' eoo(red.range)
 #' @export
 eoo <- function(spData){
   if(class(spData) == "RasterLayer"){
@@ -1163,21 +1217,27 @@ eoo <- function(spData){
 #' @param spData One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).
 #' @details AOO is calculated as the area of all known or predicted cells for the species. The resolution will be 2x2km as required by IUCN.
 #' @return A single value in km2.
-#' @examples data(red.distribution)
-#' aoo(red.distribution)
+#' @examples data(red.range)
+#' aoo(red.range)
 #' @export
 aoo <- function(spData){
   if (class(spData) == "RasterLayer"){ #if rasterlayer with 0/1
-    if (raster::xmax(spData) <= 180) {  #if longlat data
+    if(raster::maxValue(spData) == 0){  #if no data (empty raster)
+      area = 0
+    } else if (raster::xmax(spData) <= 180) {  #if longlat data
       #area = cellStats((raster::area(spData) * spData), sum)          #old version using cell area instead of 2x2 grid
-      if(res(spData)[1] > 0.05)   #if resolution is 10km convert to 2km
-        spData = disaggregate(spData, fact = 5)
+      if(res(spData)[1] > 0.05)   #if resolution is 10km convert to 1km
+        spData = disaggregate(spData, fact = 10)
       spData[spData < 1] <- NA
       spData <- rasterToPoints(spData)
-      spData <- longlat2utm(spData[,-3])
-      spData = floor(spData/2000)
-      ncells = nrow(unique(spData))
-      area = ncells * 4
+      if(nrow(unique(spData)) == 1){
+        area = 4
+      } else {
+        spData <- longlat2utm(spData[,-3])
+        spData = floor(spData/2000)
+        ncells = nrow(unique(spData))
+        area = ncells * 4
+      }
     } else { #if square data in meters
       spData[spData < 1] <- NA
       spData <- rasterToPoints(spData)
@@ -1215,25 +1275,26 @@ aoo <- function(spData){
 #' @details Maximum and minimum elevation are calculated based on the DEM.
 #' @return A vector with two values (min and max) in meters above (or below) sea level.
 #' @examples data(red.records)
-#' data(red.distribution)
+#' data(red.range)
 #' data(red.layers)
 #' dem = red.layers[[3]]
 #' elevation(red.records, dem)
-#' elevation(red.distribution, dem)
+#' elevation(red.range, dem)
 #' @export
 elevation <- function(spData, dem = NULL){
   if(class(spData) != "RasterLayer"){ #if no rasterlayer is given but just a matrix of longlat.
     if(is.null(dem) && max(spData) <= 180){
       gisdir = red.getDir()
-      dem <- raster::raster(paste(gisdir, "red_2km_20.tif", sep =""))
-      dem <- crop(dem, c(min(spData[,1]), max(spData[,1]), min(spData[,2]), max(spData[,2])))
+      dem <- raster::raster(paste(gisdir, "red_1km_20.tif", sep =""))
+      dem <- crop(dem, c(min(spData[,1])-0.1, max(spData[,1]+0.1), min(spData[,2])-0.1, max(spData[,2])+0.1))
     }
     spData = rasterize(spData, dem, field = 1, background = NA) #create a layer of presence based on the dem
   } else if (is.null(dem)){
     gisdir = red.getDir()
-    dem <- raster::raster(paste(gisdir, "red_2km_20.tif", sep = ""))
+    dem <- raster::raster(paste(gisdir, "red_1km_20.tif", sep = ""))
     dem <- crop(dem, spData)
   }
+  spData[spData == 0] <- NA
   spData <- raster::overlay(spData, dem, fun = function(x,y){(x*y)})
   out <- c(raster::minValue(spData), raster::maxValue(spData))
   names(out) <- c("Min", "Max")
@@ -1242,16 +1303,20 @@ elevation <- function(spData, dem = NULL){
 
 #' Countries of occurrence.
 #' @description Extracts the names or ISO codes of countries of occurrence of a species based on either records or predicted distribution.
-#' @param spData Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).
+#' @param spData One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).
+#' @param zone UTM zone if data is in metric units.
 #' @param ISO Outputs either country names (FALSE) or ISO codes (TRUE).
 #' @details Country boundaries and designations are based on data(worldborders) from package maptools.
 #' @return A vector with country names or codes.
 #' @examples data(red.records)
-#' data(red.distribution)
+#' data(red.range)
 #' countries(red.records)
-#' countries(red.distribution, ISO = TRUE)
+#' countries(red.range, ISO = TRUE)
 #' @export
-countries <- function(spData, ISO = FALSE){
+countries <- function(spData, zone = NULL, ISO = FALSE){
+  if ((class(spData) == "RasterLayer" && raster::xmax(spData) > 180) || (class(spData) != "RasterLayer" && max(spData) > 180))   ##if need to project to longlat
+    spData <- utm2longlat(spData, zone)
+
   worldborders <- NULL
   data(worldborders, envir = environment())
   if(class(spData) == "RasterLayer")
@@ -1267,22 +1332,33 @@ countries <- function(spData, ISO = FALSE){
 
 #' Output kml files.
 #' @description Creates kml files for Google Maps as required by IUCN guidelines.
-#' @param spData Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).
+#' @param spData One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).
+#' @param zone UTM zone if data is in metric units.
 #' @param filename The name of file to save, should end with .kml.
-#' @param minimum If the number of records is lower than the minimum no polygon in drawn, only circles of given radius around each point.
-#' @param radius radius of circles in degrees if the number of records is lower than the minimum.
-#' @return A kml with minimum convex polygon or circles around records.
+#' @param mapoption Type of representation, any of "points", "eoo" or "aoo".
+#' @param rad radius of circles in degrees if mapoption is "points". It can be the same value for all points or a vector with length equal to number of records in spData representing associated error. The default is about 10km (0.1 degrees) as per IUCN guidelines.
+#' @return A kml with polygon or circles around records.
 #' @export
-kml <- function(spData, filename, minimum = 3, radius = 0.1){
-  if(nrow(spData) < minimum){
+kml <- function(spData, zone = NULL, filename, mapoption = "aoo", rad = 0.1){
+  if ((class(spData) == "RasterLayer" && raster::xmax(spData) > 180) || (class(spData) != "RasterLayer" && max(spData) > 180))   ##if need to project to longlat
+    spData <- utm2longlat(spData, zone)
+
+  if(mapoption == "aoo" && class(spData) == "RasterLayer"){
+    spData[spData != 1] <- NA
+    spData <- rasterToPolygons(spData, dissolve = TRUE)
+    writeOGR(spData, filename, layer = filename, overwrite_layer = TRUE, driver = "KML")
+  } else if(mapoption == "points" || (class(spData) == "RasterLayer" && aoo(spData) <= 8) || nrow(spData) < 3){
     poly = list()
     for(i in 1:nrow(spData)){
-      rad = radius # radius
       pts = seq(0, 2 * pi, length.out = 100)
-      xy = cbind(spData[i, 1] + rad * sin(pts), spData[i, 2] + rad * cos(pts))
+      if(length(rad) == 1)
+        xy = cbind(spData[i, 1] + rad * sin(pts), spData[i, 2] + rad * cos(pts))
+      else
+        xy = cbind(spData[i, 1] + rad[i] * sin(pts), spData[i, 2] + rad[i] * cos(pts))
       poly[[i]] = Polygon(xy)
     }
     poly = Polygons(poly,1)
+    kmlPolygon(poly, filename, border = "red")
   } else {
     if (class(spData) == "RasterLayer"){
       e <- rasterToPoints(spData, fun = function(dat){dat == 1})   ##convert raster to points
@@ -1296,8 +1372,8 @@ kml <- function(spData, filename, minimum = 3, radius = 0.1){
     }
     poly = Polygon(vertices)
     poly = Polygons(list(poly),1)
+    kmlPolygon(poly, filename, border = "red")
   }
-  kmlPolygon(poly, filename)
 }
 
 #' Red List Index.
@@ -1450,38 +1526,38 @@ rli.sampled <- function (spData, p = 0.05, runs = 1000){
   return(accum)   #returns the accumulation curve of confidence limit of sampled RLI
 }
 
-#' Occurrence records for a fictional species in Finland.
+#' Occurrence records for Hogna maderiana (Walckenaer, 1837).
 #'
-#' Occurrence records for a fictional species in Finland.
+#' Occurrence records for Hogna maderiana (Walckenaer, 1837).
 #'
 #' @docType data
 #' @keywords datasets
 #' @name red.records
 #' @usage data(red.records)
-#' @format Matrix of longitude and latitude (two columns) of occurrence records for a fictional species in Finland.
+#' @format Matrix of longitude and latitude (two columns) of occurrence records for Hogna maderiana (Walckenaer, 1837), a spider species from Madeira Island.
 NULL
 
-#' Geographic range for a fictional species in Finland.
+#' Geographic range for Hogna maderiana (Walckenaer, 1837).
 #'
-#' Geographic range for a fictional species in Finland.
+#' Geographic range for Hogna maderiana (Walckenaer, 1837).
 #'
 #' @docType data
 #' @keywords datasets
-#' @name red.distribution
-#' @usage data(red.distribution)
-#' @format RasterLayer object as defined by package raster.
+#' @name red.range
+#' @usage data(red.range)
+#' @format RasterLayer object as defined by package raster of range for Hogna maderiana (Walckenaer, 1837), a spider species from Madeira Island.
 NULL
 
-#' Environmental layers for Finland.
+#' Environmental layers for Madeira.
 #'
-#' Average annual temperature, total annual precipitation, altitude and landcover for Finland (Hijmans et al. 2005, Tuanmu & Jetz 2014).
+#' Average annual temperature, total annual precipitation, altitude and landcover for Madeira Island (Fick & Hijmans 2017, Tuanmu & Jetz 2014).
 #'
 #' @docType data
 #' @keywords datasets
 #' @name red.layers
 #' @usage data(red.layers)
 #' @format RasterStack object as defined by package raster.
-#' @references Hijmans, R.J., Cameron, S.E, Parra, J.L., Jones, P.G. & Jarvis A. (2005) Very high resolution interpolated climate surfaces for global land areas. International Journal of Climatology, 25: 1965-1978.
+#' @references Fick, S.E. & Hijmans, R.J. (2017) Worldclim 2: new 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology, in press.
 #' @references Tuanmu, M.-N. & Jetz, W. (2014) A global 1-km consensus land-cover product for biodiversity and ecosystem modeling. Global Ecology and Biogeography, 23: 1031-1045.
 NULL
 

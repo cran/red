@@ -4,19 +4,21 @@
 \alias{kml}
 \title{Output kml files.}
 \usage{
-kml(spData, filename, minimum = 3, radius = 0.1)
+kml(spData, zone = NULL, filename, mapoption = "aoo", rad = 0.1)
 }
 \arguments{
-\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).}
+\item{spData}{One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).}
+
+\item{zone}{UTM zone if data is in metric units.}
 
 \item{filename}{The name of file to save, should end with .kml.}
 
-\item{minimum}{If the number of records is lower than the minimum no polygon in drawn, only circles of given radius around each point.}
+\item{mapoption}{Type of representation, any of "points", "eoo" or "aoo".}
 
-\item{radius}{radius of circles in degrees if the number of records is lower than the minimum.}
+\item{rad}{radius of circles in degrees if mapoption is "points". It can be the same value for all points or a vector with length equal to number of records in spData representing associated error. The default is about 10km (0.1 degrees) as per IUCN guidelines.}
 }
 \value{
-A kml with minimum convex polygon or circles around records.
+A kml with polygon or circles around records.
 }
 \description{
 Creates kml files for Google Maps as required by IUCN guidelines.

@@ -22,9 +22,9 @@ Maximum and minimum elevation are calculated based on the DEM.
 }
 \examples{
 data(red.records)
-data(red.distribution)
+data(red.range)
 data(red.layers)
 dem = red.layers[[3]]
 elevation(red.records, dem)
-elevation(red.distribution, dem)
+elevation(red.range, dem)
 }

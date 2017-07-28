@@ -4,24 +4,31 @@
 \alias{map.easy}
 \title{Species distributions made easy (multiple species).}
 \usage{
-map.easy(longlat, layers = NULL, error = NULL, dem = NULL, pca = 0,
-  file = NULL, minmodel = 0, testpercentage = 0, mintest = 20,
-  runs = 0, subset = 0)
+map.easy(longlat, layers = NULL, habitat = NULL, zone = NULL,
+  error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL,
+  mapoption = NULL, testpercentage = 0, mintest = 20, runs = 0,
+  subset = 0)
 }
 \arguments{
 \item{longlat}{data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.}
 
 \item{layers}{If NULL analyses are done with environmental layers read from data files of red.setup(). If a Raster* object as defined by package raster, analyses use these.}
 
-\item{error}{Vector of spatial error in longlat (one element per row of longlat). Used to move any point randomly within the error radius.}
+\item{habitat}{Raster* object as defined by package raster. Habitat extent layer (0/1) used instead of layers if any species is an habitat specialist.}
+
+\item{zone}{UTM zone if data is in metric units. Used only for correct placement of kmls and countries.}
+
+\item{error}{Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.}
+
+\item{move}{If TRUE, identifies and moves presence records to closest cells with environmental data. Use when spatial error might put records outside such data.}
 
 \item{dem}{RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible, otherwise it will be 0.}
 
 \item{pca}{Number of pca axes for environmental data reduction. If 0 (default) no pca is made.}
 
-\item{file}{Name of output csv file with all results. If NULL it is named "Results_All.csv".}
+\item{filename}{Name of output csv file with all results. If NULL it is named "Results_All.csv".}
 
-\item{minmodel}{Minimum number of occurrence records to perform a maxent model. If 0 (default), the function will perform analyses without modelling any species.}
+\item{mapoption}{Vector of values within options: points, habitat and sdm; each value corresponding to the function to be used for each species (map.points, map.habitat, map.sdm). If a single value, all species will be modelled according to it. If NULL, the function will perform analyses using map.points. Species values must be in same order as latlong.}
 
 \item{testpercentage}{Percentage of records used for testing only. If 0 all records will be used for both training and testing.}
 

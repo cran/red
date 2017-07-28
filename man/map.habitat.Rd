@@ -4,12 +4,14 @@
 \alias{map.habitat}
 \title{Map species distribution of habitat specialist.}
 \usage{
-map.habitat(longlat, layer, mcp = FALSE, eval = TRUE)
+map.habitat(longlat, layer, move = TRUE, mcp = FALSE, eval = TRUE)
 }
 \arguments{
 \item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.}
 
 \item{layer}{RasterLayer object representing the presence/absence (1/0) of a single habitat type.}
+
+\item{move}{If TRUE, identifies and moves presence records to closest cells with suitable habitat. Use when spatial error might put records outside the correct patch.}
 
 \item{mcp}{If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.}
 

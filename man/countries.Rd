@@ -4,10 +4,12 @@
 \alias{countries}
 \title{Countries of occurrence.}
 \usage{
-countries(spData, ISO = FALSE)
+countries(spData, zone = NULL, ISO = FALSE)
 }
 \arguments{
-\item{spData}{Either a matrix of longitude and latitude (two columns) of each occurrence record or a presence/absence map as a RasterLayer object (must be in longlat units).}
+\item{spData}{One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).}
+
+\item{zone}{UTM zone if data is in metric units.}
 
 \item{ISO}{Outputs either country names (FALSE) or ISO codes (TRUE).}
 }
@@ -22,7 +24,7 @@ Country boundaries and designations are based on data(worldborders) from package
 }
 \examples{
 data(red.records)
-data(red.distribution)
+data(red.range)
 countries(red.records)
-countries(red.distribution, ISO = TRUE)
+countries(red.range, ISO = TRUE)
 }
