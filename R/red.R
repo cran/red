@@ -1,14 +1,13 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.2.0 (2017-07-27)
+#####Version 1.2.1 (2017-10-05)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(in prep.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v1.1.1:
-#####Now working with worldclim 2 and 1km rasters instead of 2km.
-#####Improved functions kml and countries to work with utm data and kml now allows exporting points, eoo or aoo
-#####Improved map.habitat and map.easy to move records outside habitat patches or environmental layers to closest cell with data.
-#####Improved output of map.easy, map.draw and kml
-#####New example datasets included
+#####Changed from v1.2.0:
+#####More efficient calculation of AOO for large areas
+#####More eficient thinning for species with many records
+#####Centroid at outlier graph
+#####on.exit at red.setup() to avoid unexpected behavior if function fails
 
 #Todo:
 # rli*: add trees (for phylogenetic and functional diversity)
@@ -201,6 +200,7 @@ red.setup <- function(){
   }
 
   oldwd = getwd()
+  on.exit(expr = setwd(oldwd))
   gisdir = red.setDir()
   setwd(gisdir)
 
@@ -367,12 +367,13 @@ outliers <- function(longlat, layers){
   par(mfrow = c(1,2))
   map.draw(longlat, layers[[1]], spName = "Geographical")
   raster::plot(pca, main = "Environmental", type = "n")
+  centroid = colMeans(pca)
+  text(centroid[1], centroid[2], label = "X")
   for(i in 1:nrow(pca)){
     text(pca[i,1], pca[i,2], label = row.names(longlat)[i])
   }
 
   ##build new matrix ordered by distance to centroid
-  centroid = colMeans(pca)
   dist2centroid = apply(pca, 1, function(x) dist(rbind(x, centroid)))
   out = as.data.frame(cbind(longlat, dist2centroid))
   out = out[order(-dist2centroid),]
@@ -402,11 +403,17 @@ thin <- function(longlat, distance = 0.01, relative = TRUE, runs = 100){
 
   ##if relative, calculate maxDist between any two points
   if(relative){
-    maxDist = 0
-    for(x in 1:(nSites-1)){
-      for(y in (x+1):nSites){
-        maxDist = max(maxDist,((longlat[x,1]-longlat[y,1])^2+(longlat[x,2]-longlat[y,2])^2)^.5)
+    if(nSites < 40){ #if limited number of sites use all data
+      maxDist = 0
+      for(x in 1:(nSites-1)){
+        for(y in (x+1):nSites){
+          maxDist = max(maxDist,((longlat[x,1]-longlat[y,1])^2+(longlat[x,2]-longlat[y,2])^2)^.5)
+        }
       }
+    } else { #if many sites use hypothenusa of square encompassing all of them
+      horiDist = max(longlat[,1]) - min(longlat[,1])
+      vertDist = max(longlat[,2]) - min(longlat[,2])
+      maxDist = (horiDist^2 + vertDist^2)^0.5
     }
     distance = maxDist*distance
   }
@@ -655,7 +662,7 @@ raster.north <- function(dem){
 #' @param eval If TRUE, build a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.
 #' @param subset Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs. Using a small number of layers is usually better than using many variables for rare species, with few occurrence records (Lomba et al. 2010, Breiner et al. 2015).
-#' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2017). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from https://www.cs.princeton.edu/~schapire/maxent/. Copy the file 'maxent.jar' into the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
+#' @details Builds maxent (maximum entropy) species distribution models (Phillips et al. 2004, 2006; Elith et al. 2011) using function maxent from R package dismo (Hijmans et al. 2017). Dismo requires the MaxEnt species distribution model software, a java program that can be downloaded from http://biodiversityinformatics.amnh.org/open_source/maxent. Copy the file 'maxent.jar' into the 'java' folder of the dismo package. That is the folder returned by system.file("java", package="dismo"). You need MaxEnt version 3.3.3b or higher. Please note that this program (maxent.jar) cannot be redistributed or used for commercial or for-profit purposes.
 #' @return List with either one or two raster objects (depending if ensemble modelling is performed, in which case the second is a probabilistic map from all the runs) and, if eval = TRUE, a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model). Aggregate values are taken from maps after transformation of probabilities to incidence, with presence predicted for cells with ensemble values > 0.5.
 #' @references Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
 #' @references Hijmans, R.J., Phillips, S., Leathwick, J., Elith, J. (2017) dismo: Species Distribution Modeling. R package version 1.1-4. https://CRAN.R-project.org/package=dismo
@@ -734,7 +741,7 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
   }
   longlat <- move(longlat, layers)  #move all records falling on NAs
 
-  nPoints = min(1000, sum(!is.na(as.vector(layers[[1]])), na.rm=TRUE)/4)
+  nPoints = min(1000, sum(!is.na(as.vector(layers[[1]])), na.rm = TRUE)/4)
   bg <- dismo::randomPoints(layers, nPoints)                                ##extract background points
 
   ##if no categorical variables are given try to figure out which
@@ -965,6 +972,7 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @param layers If NULL analyses are done with environmental layers read from data files of red.setup(). If a Raster* object as defined by package raster, analyses use these.
 #' @param habitat Raster* object as defined by package raster. Habitat extent layer (0/1) used instead of layers if any species is an habitat specialist.
 #' @param zone UTM zone if data is in metric units. Used only for correct placement of kmls and countries.
+#' @param thin boolean defining if species data should be thinned before modeling (only for SDMs).
 #' @param error Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.
 #' @param move If TRUE, identifies and moves presence records to closest cells with environmental data. Use when spatial error might put records outside such data.
 #' @param dem RasterLayer object. It should be a digital elevation model for calculation of elevation limits of the species. If NULL, dem from red.setup() is used if possible, otherwise it will be 0.
@@ -979,9 +987,9 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @references Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
 #' @references Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 #' @export
-map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
+map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, thin = TRUE, error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
 
-  try(dev.off(), silent=T)
+  try(dev.off(), silent = TRUE)
   spNames <- unique(longlat[,1])
   nSp <- length(spNames)
 
@@ -1044,6 +1052,8 @@ map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, error 
     if(mapoption[s]  == "sdm" && aoo(move(spData, layers)) > 8){
       if(move)
         spData <- move(spData, layers)
+      if(thin)
+        spData <- thin(spData)
       if(testpercentage > 0)
         p <- map.sdm(spData, layers, spError, testpercentage = testpercentage, mcp = TRUE, runs = runs, subset = subset)
       else
@@ -1180,7 +1190,7 @@ eoo <- function(spData){
       if(length(vertices) < 3) return(0)
       vertices <- c(vertices, vertices[1])
       vertices <- e[vertices,c(1,2)]
-      area = areaPolygon(vertices)/1000000
+      area = geosphere::areaPolygon(vertices)/1000000
     } else {
       spData[spData < 1] <- NA
       spData <- rasterToPoints(spData)
@@ -1199,7 +1209,7 @@ eoo <- function(spData){
     vertices <- c(vertices, vertices[1])
     vertices <- spData[vertices,]
     if(max(spData) <= 180) {  #if longlat data
-      area = areaPolygon(vertices)/1000000
+      area = geosphere::areaPolygon(vertices)/1000000
     } else { #if square data in meters
       area = 0
       for(i in 1:(nrow(vertices)-1))
@@ -1209,7 +1219,7 @@ eoo <- function(spData){
   } else {
     return(warning("Data format not recognized"))
   }
-  return(area)
+  return(round(area))
 }
 
 #' Area of Occupancy (AOO).
@@ -1225,18 +1235,19 @@ aoo <- function(spData){
     if(raster::maxValue(spData) == 0){  #if no data (empty raster)
       area = 0
     } else if (raster::xmax(spData) <= 180) {  #if longlat data
-      #area = cellStats((raster::area(spData) * spData), sum)          #old version using cell area instead of 2x2 grid
-      if(res(spData)[1] > 0.05)   #if resolution is 10km convert to 1km
-        spData = disaggregate(spData, fact = 10)
-      spData[spData < 1] <- NA
-      spData <- rasterToPoints(spData)
-      if(nrow(unique(spData)) == 1){
-        area = 4
+      if(res(spData)[1] > 0.05){ #if resolution is > 1km use area of cells rounded to nearest 4km
+        area = round(cellStats((raster::area(spData) * spData), sum)/4)*4
       } else {
-        spData <- longlat2utm(spData[,-3])
-        spData = floor(spData/2000)
-        ncells = nrow(unique(spData))
-        area = ncells * 4
+        spData[spData < 1] <- NA
+        spData <- rasterToPoints(spData)
+        if(nrow(unique(spData)) == 1){
+          area = 4
+        } else {
+          spData <- longlat2utm(spData[,-3])
+          spData = floor(spData/2000)
+          ncells = nrow(unique(spData))
+          area = ncells * 4
+        }
       }
     } else { #if square data in meters
       spData[spData < 1] <- NA
@@ -1247,12 +1258,6 @@ aoo <- function(spData){
     }
   } else if (ncol(spData) == 2){
     if (max(spData) <= 180) {  #if longlat data
-      #layer = raster.read(spData, ext = 0.1)[[1]]                     #old version using cell area instead of 2x2 grid
-      #gisdir = red.getDir()
-      #layer = raster(paste(gisdir, "red_2km_1.tif", sep = ""))
-      #spData <- spData[!is.na(extract(layer, spData)),]
-      #layer = rasterize(spData, layer, field = 1)
-      #area = cellStats((raster::area(layer) * layer), sum)
       spData <- longlat2utm(spData)
       spData = floor(spData/2000)
       ncells = nrow(unique(spData))
@@ -1265,7 +1270,7 @@ aoo <- function(spData){
   } else {
     return(warning("Data format not recognized!"))
   }
-  return(area)
+  return(round(area))
 }
 
 #' Elevation limits.
@@ -1298,7 +1303,7 @@ elevation <- function(spData, dem = NULL){
   spData <- raster::overlay(spData, dem, fun = function(x,y){(x*y)})
   out <- c(raster::minValue(spData), raster::maxValue(spData))
   names(out) <- c("Min", "Max")
-  return(out)
+  return(round(out))
 }
 
 #' Countries of occurrence.
@@ -1440,7 +1445,7 @@ rli <- function (spData, boot = FALSE, runs = 1000){
 #' @param boot If TRUE bootstrapping for statistical significance is performed on both values per date and the trend between dates.
 #' @param runs Number of runs for bootstrapping
 #' @details The IUCN Red List Index (RLI) (Butchart et al. 2004, 2007) reflects overall changes in IUCN Red List status over time of a group of taxa.
-#' The RLI uses weight scores based on the Red List status of each of the assessed species. These scores range from 0 (Least Concern) to Extinct/Extinct in the Wild (5).
+#' The RLI uses weight scores based on the Red List status of each of the assessed species. These scores range from 0 (Least Concern) to 5 (Extinct/Extinct in the Wild).
 #' Summing these scores across all species and relating them to the worst-case scenario, i.e. all species extinct, gives us an indication of how biodiversity is doing.
 #' Importantly, the RLI is based on true improvements or deteriorations in the status of species, i.e. genuine changes. It excludes category changes resulting from, e.g., new knowledge (Butchart et al. 2007).
 #' The RLI approach helps to develop a better understanding of which taxa, regions or ecosystems are declining or improving.

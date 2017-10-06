@@ -5,9 +5,9 @@
 \title{Species distributions made easy (multiple species).}
 \usage{
 map.easy(longlat, layers = NULL, habitat = NULL, zone = NULL,
-  error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL,
-  mapoption = NULL, testpercentage = 0, mintest = 20, runs = 0,
-  subset = 0)
+  thin = TRUE, error = NULL, move = TRUE, dem = NULL, pca = 0,
+  filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20,
+  runs = 0, subset = 0)
 }
 \arguments{
 \item{longlat}{data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.}
@@ -17,6 +17,8 @@ map.easy(longlat, layers = NULL, habitat = NULL, zone = NULL,
 \item{habitat}{Raster* object as defined by package raster. Habitat extent layer (0/1) used instead of layers if any species is an habitat specialist.}
 
 \item{zone}{UTM zone if data is in metric units. Used only for correct placement of kmls and countries.}
+
+\item{thin}{boolean defining if species data should be thinned before modeling (only for SDMs).}
 
 \item{error}{Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.}
 
