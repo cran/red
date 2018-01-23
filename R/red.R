@@ -1,12 +1,12 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.3.0 (2017-10-17)
+#####Version 1.3.1 (2018-01-18)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(subm.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v1.2.1:
-#####rli.map: added function
-#####eoo, aoo: can now use probabilistic maps and output confidence limits.
-#####rli, rli.multi, rli.sample: added trees for phylogenetic and functional diversity and now accept NA values.
+#####Changed from v1.3.0:
+#####added option to force observed sites into map.sdm, map.habitat and map.easy
+#####added option to take year of collection and ID confidence into account in map.sdm
+#####corrected bug in the RLI calculations for when few species existed
 
 #####required packages
 library("BAT")
@@ -98,8 +98,8 @@ rli.calc <- function(spData, tree = NULL, boot = FALSE, runs = 1000){
     spData <- replace(spData, which(spData == "LC" ), 1)
     spData <- replace(spData, which(spData == "DD" ), NA)
     spData <- as.numeric(spData)
-  } else if (max(spData, na.rm = TRUE) > 1){                       ##if a scale [0,5] is given, convert to [0,1]
-    spData <- 1 - spData / 5
+  } else if (all(spData == floor(spData))){  #if all integers, a scale [0,5] is given, convert to [0,1]
+    spData <- 1 - spData/5
   }
   if(is.null(tree)){                           ##if not weighted by PD or FD
     if(!boot){                                 ##if no bootstrap to be made
@@ -641,10 +641,13 @@ raster.north <- function(dem){
 #' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.
 #' @param layers Predictor variables, a Raster* object as defined by package raster.
 #' @param error Vector of spatial error in longlat (one element per row of longlat) in the same unit as longlat. Used to move any point randomly within the error radius.
+#' @param year Vector of sampling years in longlat (one element per row of longlat). Used to exclude old records with a given probability proportional to time passed since sampling (never excluded only for current year).
+#' @param idconf Vector of identification confidence in longlat (one element per row of longlat). Used to exclude uncertain records with a given probability. Can be on any scale where max values are certain (e.g. from 1 - very uncertain to 10 - holotype).
 #' @param categorical Vector of layer indices of categorical (as opposed to quantitative) data. If NULL the package will try to find them automatically based on the data.
 #' @param thres Threshold of logistic output used for conversion of probabilistic to binary (presence/absence) maps. If 0 this will be the value that maximizes the sum of sensitivity and specificity.
 #' @param testpercentage Percentage of records used for testing only. If 0 all records will be used for both training and testing.
 #' @param mcp Used for a precautionary approach. If TRUE, all areas predicted as present but outside the minimum convex hull polygon encompassing all occurrence records are converted to absence. Exceptions are cells connected to other areas inside the polygon.
+#' @param points If TRUE, force map to include cells with presence records even if suitable habitat was not identified.
 #' @param eval If TRUE, build a matrix with AUC, Kappa, TSS, EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.
 #' @param subset Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs. Using a small number of layers is usually better than using many variables for rare species, with few occurrence records (Lomba et al. 2010, Breiner et al. 2015).
@@ -657,12 +660,42 @@ raster.north <- function(dem){
 #' @references Phillips, S.J., Anderson, R.P., Schapire, R.E. (2006) Maximum entropy modeling of species geographic distributions. Ecological Modelling, 190: 231-259.
 #' @references Elith, J., Phillips, S.J., Hastie, T., Dudik, M., Chee, Y.E., Yates, C.J. (2011) A statistical explanation of MaxEnt for ecologists. Diversity and Distributions, 17: 43-57.
 #' @export
-map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0, testpercentage = 0, mcp = TRUE, eval = TRUE, runs = 0, subset = 0){
+map.sdm <- function(longlat, layers, error = NULL, year = NULL, idconf = NULL, categorical = NULL, thres = 0, testpercentage = 0, mcp = TRUE, points = FALSE, eval = TRUE, runs = 0, subset = 0){
 
   raster::rasterOptions(maxmemory = 2e+09)
+  origLonglat = longlat
 
   ##if ensemble is to be done
   if(runs > 0){
+    longlat = origLonglat
+    
+    #if there is spatial error randomly move points within its radius
+    if(!is.null(error)){
+      for(i in 1:nrow(longlat)){
+        #move up to given error (angular movement converted to x and y)
+        rndAngle = sample(1:360, 1)
+        rndDist = runif(1, 0, error[i])
+        longlat[i,1] = longlat[i,1] + rndDist * cos(rndAngle)
+        longlat[i,2] = longlat[i,2] + rndDist * sin(rndAngle)
+      }
+    }
+    
+    #if there is year
+    if(!is.null(year)){
+      for(i in 1:nrow(longlat)){
+        if(year[i] < sample(min(year):as.integer(substr(Sys.Date(), 1, 4)), 1))
+          longlat = longlat[-i,]
+      }
+    }
+
+    #if there is idconf
+    if(!is.null(idconf)){
+      for(i in 1:nrow(longlat)){
+        if(idconf[i] < sample(1:max(idconf), 1))
+          longlat = longlat[-i,]
+      }
+    }
+
     if(eval)
       runEval = matrix(NA, nrow = 1, ncol = 7)
     runMap <- rasterize(longlat, layers[[1]], field = 0, background = 0)
@@ -671,9 +704,9 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
     for(i in 1:runs){
       if(subset > 0 && subset < dim(layers)[3]){
         runLayers <- layers[[sample.int(dim(layers)[3], subset)]]
-        thisRun <- map.sdm(longlat, runLayers, error, categorical, thres, testpercentage, mcp, eval, runs = 0, subset = 0)
+        thisRun <- map.sdm(longlat, runLayers, error = NULL, year = NULL, idconf = NULL, categorical, thres, testpercentage, mcp, points, eval, runs = 0, subset = 0)
       } else {
-        thisRun <- map.sdm(longlat, layers, error, categorical, thres, testpercentage, mcp, eval, runs = 0, subset = 0)
+        thisRun <- map.sdm(longlat, layers, error = NULL, year = NULL, idconf = NULL, categorical, thres, testpercentage, mcp, points, eval, runs = 0, subset = 0)
       }
       runAUC = 1
       if(eval){
@@ -715,22 +748,12 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
     }
   }
 
-  #if there is error randomly move points within its radius
-  if(!is.null(error)){
-    for(i in 1:nrow(longlat)){
-      #move up to given error (angular movement converted to x and y)
-      rndAngle = sample(1:360, 1)
-      rndDist = runif(1, 0, error[i])
-      longlat[i,1] = longlat[i,1] + rndDist * cos(rndAngle)
-      longlat[i,2] = longlat[i,2] + rndDist * sin(rndAngle)
-    }
-  }
   longlat <- move(longlat, layers)  #move all records falling on NAs
 
   nPoints = min(1000, sum(!is.na(as.vector(layers[[1]])), na.rm = TRUE)/4)
   bg <- dismo::randomPoints(layers, nPoints)                                ##extract background points
 
-  ##if no categorical variables are given try to figure out which
+  ##if no categorical variables are given try to figure out which are
   if(is.null(categorical))
     categorical <- find.categorical(layers)
 
@@ -751,6 +774,9 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
 
   if(mcp && aoo(p) >= 4)
     p <- map.habitat(longlat, p, mcp = TRUE, eval = FALSE)
+  
+  if(points)
+    p <- max(p, map.points(longlat, p, eval = FALSE))
 
   if(eval){
     e <- dismo::evaluate(p = llTest, a = bg, model = mod, x = layers, tr = thres)                  ##do evaluation of model with threshold
@@ -780,11 +806,16 @@ map.sdm <- function(longlat, layers, error = NULL, categorical = NULL, thres = 0
 #' @param layer RasterLayer object representing the presence/absence (1/0) of a single habitat type.
 #' @param move If TRUE, identifies and moves presence records to closest cells with suitable habitat. Use when spatial error might put records outside the correct patch.
 #' @param mcp If TRUE, all habitat patches inside the minimum convex hull polygon encompassing all occurrence records are converted to presence.
+#' @param points If TRUE, force map to include cells with presence records even if suitable habitat was not identified.
 #' @param eval If TRUE, build a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @details In many cases a species has a very restricted habitat and we generally know where it occurs. In such cases using the distribution of the known habitat patches may be enough to map the species.
 #' @return One raster object and, if eval = TRUE, a matrix with EOO (from raw data), EOO (from model), AOO (from raw data) and AOO (from model).
 #' @export
-map.habitat <- function(longlat, layer, move = TRUE, mcp = FALSE, eval = TRUE){
+map.habitat <- function(longlat, layer, move = TRUE, mcp = FALSE, points = FALSE, eval = TRUE){
+
+  if(points)
+    layer <- max(layer, map.points(longlat, layer, eval = FALSE))
+  
   if(move){
     moveLayer <- layer
     moveLayer[moveLayer == 0] <- NA
@@ -869,13 +900,14 @@ map.points <- function(longlat, layers, eval = TRUE){
 #' @param mapoption Vector of values within options: points, habitat and sdm; each value corresponding to the function to be used for each species (map.points, map.habitat, map.sdm). If a single value, all species will be modelled according to it. If NULL, the function will perform analyses using map.points. Species values must be in same order as latlong.
 #' @param testpercentage Percentage of records used for testing only. If 0 all records will be used for both training and testing.
 #' @param mintest Minimim number of total occurrence records of any species to set aside a test set. Only used if testpercentage > 0.
+#' @param points If TRUE, force map to include cells with presence records even if suitable habitat was not identified.
 #' @param runs If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.
 #' @param subset Number of predictive variables to be randomly selected from layers for each run if runs > 0. If <= 0 all layers are used on all runs. Using a small number of layers is usually better than using many variables for rare species, with few occurrence records (Lomba et al. 2010, Breiner et al. 2015).
 #' @return Outputs maps in asc, pdf and kml format, plus a file with EOO, AOO and a list of countries where the species is predicted to be present if possible to extract.
 #' @references Breiner, F.T., Guisan, A., Bergamini, A., Nobis, M.P. (2015) Overcoming limitations of modelling rare species by using ensembles of small models. Methods in Ecology and Evolution, 6: 1210-1218.
 #' @references Lomba, A., Pellissier, L., Randin, C.F., Vicente, J., Moreira, F., Honrado, J., Guisan, A. (2010) Overcoming the rare species modelling paradox: a novel hierarchical framework applied to an Iberian endemic plant. Biological Conservation, 143: 2647-2657.
 #' @export
-map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, thin = TRUE, error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20, runs = 0, subset = 0){
+map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, thin = TRUE, error = NULL, move = TRUE, dem = NULL, pca = 0, filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20, points = FALSE, runs = 0, subset = 0){
 
   try(dev.off(), silent = TRUE)
   spNames <- unique(longlat[,1])
@@ -943,11 +975,11 @@ map.easy <- function(longlat, layers = NULL, habitat = NULL, zone = NULL, thin =
       if(thin)
         spData <- thin(spData)
       if(testpercentage > 0)
-        p <- map.sdm(spData, layers, spError, testpercentage = testpercentage, mcp = TRUE, runs = runs, subset = subset)
+        p <- map.sdm(spData, layers, spError, testpercentage = testpercentage, mcp = TRUE, points = points, runs = runs, subset = subset)
       else
-        p <- map.sdm(spData, layers, spError, testpercentage = 0, mcp = TRUE, runs = runs, subset = subset)
+        p <- map.sdm(spData, layers, spError, testpercentage = 0, mcp = TRUE, points = points, runs = runs, subset = subset)
     } else if (mapoption[s] == "habitat"){
-      p <- map.habitat(spData, habitat, move)
+      p <- map.habitat(spData, habitat, move, points = points)
     } else {
       mapoption[s] = "points"
       p <- map.points(spData, layers)

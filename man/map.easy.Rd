@@ -7,7 +7,7 @@
 map.easy(longlat, layers = NULL, habitat = NULL, zone = NULL,
   thin = TRUE, error = NULL, move = TRUE, dem = NULL, pca = 0,
   filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20,
-  runs = 0, subset = 0)
+  points = FALSE, runs = 0, subset = 0)
 }
 \arguments{
 \item{longlat}{data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.}
@@ -35,6 +35,8 @@ map.easy(longlat, layers = NULL, habitat = NULL, zone = NULL,
 \item{testpercentage}{Percentage of records used for testing only. If 0 all records will be used for both training and testing.}
 
 \item{mintest}{Minimim number of total occurrence records of any species to set aside a test set. Only used if testpercentage > 0.}
+
+\item{points}{If TRUE, force map to include cells with presence records even if suitable habitat was not identified.}
 
 \item{runs}{If <= 0 no ensemble modelling is performed. If > 0, ensemble modelling with n runs is made. For each run, a new random sample of occurrence records (if testpercentage > 0), background points and predictive variables (if subset > 0) are chosen. In the ensemble model, each run is weighted as max(0, (runAUC - 0.5)) ^ 2.}
 
