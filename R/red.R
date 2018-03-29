@@ -1,12 +1,11 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.3.1 (2018-01-18)
+#####Version 1.3.3 (2018-03-29)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
-#####Reference: Cardoso, P.(subm.) An R package to facilitate species red list assessments according to the IUCN criteria.
-#####Changed from v1.3.0:
-#####added option to force observed sites into map.sdm, map.habitat and map.easy
-#####added option to take year of collection and ID confidence into account in map.sdm
-#####corrected bug in the RLI calculations for when few species existed
+#####Reference: Cardoso, P.(2017) An R package to facilitate species red list assessments according to the IUCN criteria. Biodiversity Data Journal 5: e20530 doi: 10.3897/BDJ.5.e20530
+#####Changed from v1.3.2:
+#####corrected error in map.sdm
+
 
 #####required packages
 library("BAT")
@@ -16,6 +15,7 @@ library("graphics")
 library("grDevices")
 library("jsonlite")
 library("maptools")
+library("methods")
 library("raster")
 library("rgdal")
 library("rgeos")
@@ -32,6 +32,7 @@ library("utils")
 #' @import utils
 #' @importFrom geosphere areaPolygon
 #' @importFrom grDevices chull dev.copy dev.off pdf
+#' @importFrom methods slot
 #' @importFrom raster area cellStats clump crop extent extract getValues layerStats mask raster rasterize rasterToPoints rasterToPolygons reclassify res sampleRandom scalebar terrain trim writeRaster xmax xmin
 
 ###############################################################################
@@ -39,6 +40,7 @@ library("utils")
 ###############################################################################
 
 raster::rasterOptions(maxmemory = 2e+09)
+globalVariables(c("worldborders"))
 
 longlat2utm <- function(longlat){
   longlat = as.matrix(longlat)
@@ -141,13 +143,15 @@ rli.calc <- function(spData, tree = NULL, boot = FALSE, runs = 1000){
 
 #' Setup GIS directory.
 #' @description Setup directory where GIS files are stored.
+#' @param gisPath Path to the directory where the gis files are stored.
 #' @details Writes a txt file in the red directory allowing the package to always access the world GIS files directory.
 #' @export
-red.setDir <- function(){
+red.setDir <- function(gisPath = NULL){
+  if(is.null(gisPath))
+    gisPath <- readline("Input directory for storing world gis layers:")
+  gisPath <- paste(gisPath, "/", sep = "")
   redFile <- paste(find.package("red"), "/red.txt", sep = "")
-  dir <- readline("Input directory for storing world gis layers:")
-  dir <- paste(dir, "/", sep = "")
-  dput(dir, redFile)
+  dput(gisPath, redFile)
 }
 
 #' Read GIS directory.
@@ -723,7 +727,7 @@ map.sdm <- function(longlat, layers, error = NULL, year = NULL, idconf = NULL, c
     upMap <- reclassify(runMap, matrix(c(0,0.025,0,0.025,1,1), ncol = 3, byrow = TRUE))
     consensusMap <- reclassify(runMap, matrix(c(0,0.499,0,0.499,1,1), ncol = 3, byrow = TRUE))
     downMap <- reclassify(runMap, matrix(c(0,0.975,0,0.975,1,1), ncol = 3, byrow = TRUE))
-    if(mcp && aoo(runMap[2]) >= 4)
+    if(mcp && aoo(consensusMap) >= 4)
       consensusMap <- map.habitat(longlat, consensusMap, mcp = TRUE, eval = FALSE)
 
     if(eval){
@@ -1275,17 +1279,79 @@ countries <- function(spData, zone = NULL, ISO = FALSE){
 #' @param zone UTM zone if data is in metric units.
 #' @param filename The name of file to save, should end with .kml.
 #' @param mapoption Type of representation, any of "points", "eoo" or "aoo".
+#' @param smooth Smooths the kml lines as per IUCN guidelines. Higher values represent smoother polygons.
 #' @param rad radius of circles in degrees if mapoption is "points". It can be the same value for all points or a vector with length equal to number of records in spData representing associated error. The default is about 10km (0.1 degrees) as per IUCN guidelines.
 #' @return A kml with polygon or circles around records.
 #' @export
-kml <- function(spData, zone = NULL, filename, mapoption = "aoo", rad = 0.1){
+kml <- function(spData, zone = NULL, filename, mapoption = "aoo", smooth = 0, rad = 0.1){
   if ((class(spData) == "RasterLayer" && raster::xmax(spData) > 180) || (class(spData) != "RasterLayer" && max(spData) > 180))   ##if need to project to longlat
     spData <- utm2longlat(spData, zone)
-
+  
   if(mapoption == "aoo" && class(spData) == "RasterLayer"){
     spData[spData != 1] <- NA
     spData <- rasterToPolygons(spData, dissolve = TRUE)
-    writeOGR(spData, filename, layer = filename, overwrite_layer = TRUE, driver = "KML")
+
+    #simplify
+    if(smooth > 0){
+      trytol <- c(seq(0.001,0.01,0.001),seq(0.02,0.1,0.01),seq(0.2,1,0.1),2:10,seq(20,100,10),seq(200,1000,100),seq(2000,10000,1000),seq(20000,100000,10000),seq(200000,1000000,100000))
+      for (i in trytol){
+        if(class(try(gSimplify(spData, tol = (1 / i)), silent = TRUE)) != "try-error"){
+          spData <- gSimplify(spData, tol = (smooth / (i*10)))
+          break
+        }
+      }
+
+      #cut to coast
+      spData <- gIntersection(worldborders, spData)
+
+      #round
+      smooth = smooth * 100
+      polys = methods::slot(spData@polygons[[1]], "Polygons")
+
+      spline.poly <- function(xy, vertices, k=3, ...) {
+        # Assert: xy is an n by 2 matrix with n >= k.
+
+        # Wrap k vertices around each end.
+        n <- dim(xy)[1]
+        if (k >= 1) {
+          data <- rbind(xy[(n-k+1):n,], xy, xy[1:k, ])
+        } else {
+          data <- xy
+        }
+
+        # Spline the x and y coordinates.
+        data.spline <- spline(1:(n+2*k), data[,1], n=vertices, ...)
+        x <- data.spline$x
+        x1 <- data.spline$y
+        x2 <- spline(1:(n+2*k), data[,2], n=vertices, ...)$y
+
+        # Retain only the middle part.
+        cbind(x1, x2)[k < x & x <= n+k, ]
+      }
+
+      spData <- SpatialPolygons(
+        Srl = lapply(1:length(polys),
+                     function(x){
+                       p <- polys[[x]]
+
+                       #applying spline.poly function for smoothing polygon edges
+                       px <- methods::slot(polys[[x]], "coords")[,1]
+                       py <- methods::slot(polys[[x]], "coords")[,2]
+                       bz <- spline.poly(methods::slot(polys[[x]], "coords"),smooth, k=3)
+                       bz <- rbind(bz, bz[1,])
+                       methods::slot(p, "coords") <- bz
+
+                       # create Polygons object
+                       poly <- Polygons(list(p), ID = x)
+                     }
+        )
+      )
+      spData <- SpatialPolygonsDataFrame(spData, data=data.frame(ID = 1:length(spData)))
+      kmlPolygons(spData, filename, name = filename, col = '#FFFFFFAA', border = "red", lwd = 2)
+    } else {
+      kmlPolygon(spData, filename, name = filename, col = '#FFFFFFAA', border = "red", lwd = 2)
+    }
+    
   } else if(mapoption == "points" || (class(spData) == "RasterLayer" && aoo(spData) <= 8) || nrow(spData) < 3){
     poly = list()
     for(i in 1:nrow(spData)){
@@ -1297,7 +1363,7 @@ kml <- function(spData, zone = NULL, filename, mapoption = "aoo", rad = 0.1){
       poly[[i]] = Polygon(xy)
     }
     poly = Polygons(poly,1)
-    kmlPolygon(poly, filename, border = "red")
+    kmlPolygon(poly, filename, name = filename, col = '#FFFFFFAA', border = "red", lwd = 2)
   } else {
     if (class(spData) == "RasterLayer"){
       e <- rasterToPoints(spData, fun = function(dat){dat == 1})   ##convert raster to points
@@ -1311,7 +1377,7 @@ kml <- function(spData, zone = NULL, filename, mapoption = "aoo", rad = 0.1){
     }
     poly = Polygon(vertices)
     poly = Polygons(list(poly),1)
-    kmlPolygon(poly, filename, border = "red")
+    kmlPolygon(poly, filename, name = filename, col = '#FFFFFFAA', border = "red", lwd = 2)
   }
 }
 
