@@ -1,6 +1,6 @@
-dd7fa2852c35510f9d7209dbd999ada9 *DESCRIPTION
-a5e8e0fbf986bef73b22ba12ff0522fa *NAMESPACE
-31387a81cd75fd89545f435ab38c5806 *R/red.R
+f133d82866c55079b31f1531f6182c6f *DESCRIPTION
+a9f5c78695b1c2c022b02ae6ce7b9a58 *NAMESPACE
+bb5559a068002b523a14d35961f3e9a9 *R/red.R
 b0dad56d7b229b2ccd7ee408ccd2b62d *data/red.layers.rda
 1b56f60d34823e6a64b2fae97c35d1b5 *data/red.range.rda
 838b11d5aed482ca57b1febf3e134832 *data/red.records.rda
@@ -18,6 +18,7 @@ b9335f7c4cda338ec942a03aff0d5863 *man/map.habitat.Rd
 d2de184bf0293b1d7605a81cfef5e736 *man/move.Rd
 6baaeb60a49d9f3eb1168a8b172280ad *man/outliers.Rd
 2c353e4df7d31df2f0d5cd602e353951 *man/raster.clean.Rd
+22d8a6534d5ee705a453df44a82831b6 *man/raster.distance.Rd
 9eab1de281bfda540bcf7407a052a0a8 *man/raster.east.Rd
 c739b4628ff437d3925ff0b64b6d3aec *man/raster.lat.Rd
 4ac472639598e674cd86971d78e1be46 *man/raster.long.Rd

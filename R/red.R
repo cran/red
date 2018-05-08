@@ -1,11 +1,10 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.3.3 (2018-03-29)
+#####Version 1.4.0 (2018-05-08)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(2017) An R package to facilitate species red list assessments according to the IUCN criteria. Biodiversity Data Journal 5: e20530 doi: 10.3897/BDJ.5.e20530
-#####Changed from v1.3.2:
-#####corrected error in map.sdm
-
+#####Changed from v1.3.3:
+#####added function raster.distance()
 
 #####required packages
 library("BAT")
@@ -576,6 +575,49 @@ raster.reduce <- function(layers, method = "pca", n = NULL, thres = NULL){
   }
   out <- raster::stack(layers, out)
   return(out)
+}
+
+#' Create distance layer.
+#' @description Create a layer depicting minimum, average or maximum distance to records.
+#' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.
+#' @param layers Raster* object as defined by package raster to serve as model to create distance layer.
+#' @param type text string indicating whether the output should be the "minimum", "average" or "mcp" distance to all records. "mcp" means the distance to the minimum convex polygon encompassing all records.
+#' @details Using distance to records in models may help limiting the extrapolation of the predicted area much beyond known areas.
+#' @return A RasterLayer object.
+#' @examples data(red.layers)
+#' data(red.records)
+#' par(mfrow=c(2,2))
+#' raster::plot(red.layers[[1]])
+#' points(red.records)
+#' raster::plot(raster.distance(red.records, red.layers))
+#' raster::plot(raster.distance(red.records, red.layers, type = "average"))
+#' raster::plot(raster.distance(red.records, red.layers, type = "mcp"))
+#' @export
+raster.distance <- function(longlat, layers, type = "minimum"){
+  if(dim(layers)[3] > 1)
+    layers <- layers[[1]]
+  layers[!is.na(layers)] <- 0
+  if(type == "average"){
+    for(d in 1:nrow(longlat)){
+      layers <- layers + raster::distanceFromPoints(layers, longlat[d,])
+    }
+    layers <- layers/nrow(longlat)
+    names(layers) <- "average distance"
+  } else if (type == "mcp"){
+    vertices <- chull(longlat)
+    vertices <- c(vertices, vertices[1])
+    vertices <- longlat[vertices,]
+    poly = Polygon(vertices)
+    poly = Polygons(list(poly),1)
+    poly = SpatialPolygons(list(poly))    ##minimum convex polygon
+    longlat = rasterToPoints(rasterize(poly, layers))[,1:2]
+    layers <- mask(raster::distanceFromPoints(layers, longlat), layers)
+    names(layers) <- "mcp distance"
+  } else {
+    layers <- mask(raster::distanceFromPoints(layers, longlat), layers)
+    names(layers) <- "minimum distance"
+  }
+  return(layers)
 }
 
 #' Create longitude layer.
