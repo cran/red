@@ -9,26 +9,28 @@ raster.distance(longlat, layers, type = "minimum")
 \arguments{
 \item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.}
 
-\item{layers}{Raster* object as defined by package raster to serve as model to create distance layer.}
+\item{layers}{Raster* object as defined by package raster to serve as model to create distance layer. Cost surface in case of param ="cost".}
 
-\item{type}{text string indicating whether the output should be the "minimum", "average" or "mcp" distance to all records. "mcp" means the distance to the minimum convex polygon encompassing all records.}
+\item{type}{text string indicating whether the output should be the "minimum", "average", "mcp" or "cost" distance to all records. "mcp" means the distance to the minimum convex polygon encompassing all records.}
 }
 \value{
 A RasterLayer object.
 }
 \description{
-Create a layer depicting minimum, average or maximum distance to records.
+Creates a layer depicting distances to records using the minimum, average, distance to the minimum convex polygon or distance taking into account a cost surface.
 }
 \details{
 Using distance to records in models may help limiting the extrapolation of the predicted area much beyond known areas.
 }
 \examples{
 data(red.layers)
+alt = red.layers[[3]]
 data(red.records)
-par(mfrow=c(2,2))
-raster::plot(red.layers[[1]])
+par(mfrow=c(3,2))
+raster::plot(alt)
 points(red.records)
-raster::plot(raster.distance(red.records, red.layers))
-raster::plot(raster.distance(red.records, red.layers, type = "average"))
-raster::plot(raster.distance(red.records, red.layers, type = "mcp"))
+raster::plot(raster.distance(red.records, alt))
+raster::plot(raster.distance(red.records, alt, type = "average"))
+raster::plot(raster.distance(red.records, alt, type = "mcp"))
+raster::plot(raster.distance(red.records, alt, type = "cost"))
 }

@@ -4,7 +4,7 @@
 \alias{rli}
 \title{Red List Index.}
 \usage{
-rli(spData, tree = NULL, boot = FALSE, runs = 1000)
+rli(spData, tree = NULL, boot = FALSE, dd = FALSE, runs = 1000)
 }
 \arguments{
 \item{spData}{Either a vector with species assessment categories for a single point in time or a matrix with two points in time in different columns (species x date). Values can be text (EX, EW, RE, CR, EN, VU, NT, DD, LC) or numeric (0 for LC, 1 for NT, 2 for VU, 3 for EN, 4 for CR, 5 for RE/EW/EX).}
@@ -12,6 +12,8 @@ rli(spData, tree = NULL, boot = FALSE, runs = 1000)
 \item{tree}{An hclust or phylo object (used when species are weighted by their unique contribution to phylogenetic or functional diversity).}
 
 \item{boot}{If TRUE bootstrapping for statistical significance is performed on both values per date and the trend between dates.}
+
+\item{dd}{bootstrap among all species (FALSE) or Data Deficient species only (TRUE).}
 
 \item{runs}{Number of runs for bootstrapping}
 }
@@ -31,12 +33,12 @@ The RLI approach helps to develop a better understanding of which taxa, regions 
 Juslen et al. (2016a, b) suggested the use of bootstrapping to search for statistical significance when comparing taxa or for trends in time of the index and this approach is here implemented.
 }
 \examples{
-rliData <- matrix(c("LC","LC","EN","EN","EX","EX","LC","CR","CR","EX"), ncol = 2, byrow = TRUE)
+rliData <- matrix(c("LC","LC","EN","EN","EX","EX","LC","CR","DD","DD"), ncol = 2, byrow = TRUE)
 colnames(rliData) <- c("2000", "2010")
 rli(rliData[,1])
 rli(rliData[,1], boot = TRUE)
 rli(rliData)
-rli(rliData, boot = TRUE)
+rli(rliData, boot = TRUE, dd = TRUE)
 }
 \references{
 Butchart, S.H.M., Stattersfield, A.J., Bennun, L.A., Shutes, S.M., Akcakaya, H.R., Baillie, J.E.M., Stuart, S.N., Hilton-Taylor, C. & Mace, G.M. (2004) Measuring global trends in the status of biodiversity: Red List Indices for birds. PloS Biology, 2: 2294-2304.

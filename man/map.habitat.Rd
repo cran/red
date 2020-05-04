@@ -4,8 +4,14 @@
 \alias{map.habitat}
 \title{Map species distribution of habitat specialist.}
 \usage{
-map.habitat(longlat, layer, move = TRUE, mcp = FALSE, points = FALSE,
-  eval = TRUE)
+map.habitat(
+  longlat,
+  layer,
+  move = TRUE,
+  mcp = FALSE,
+  points = FALSE,
+  eval = TRUE
+)
 }
 \arguments{
 \item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.}

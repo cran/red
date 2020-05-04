@@ -4,8 +4,7 @@
 \alias{kml}
 \title{Output kml files.}
 \usage{
-kml(spData, zone = NULL, filename, mapoption = "aoo", smooth = 0,
-  rad = 0.1)
+kml(spData, zone = NULL, filename, mapoption = "aoo", smooth = 0, rad = 0.1)
 }
 \arguments{
 \item{spData}{One of three options: 1) matrix of longitude and latitude (two columns) of each occurrence record; 2) matrix of easting and northing (two columns, e.g. UTM) of each occurrence record in meters;  3) RasterLayer object of predicted distribution (0/1 values).}

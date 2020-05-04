@@ -1,14 +1,16 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.4.0 (2018-05-08)
+#####Version 1.5.0 (2020-05-04)
 #####By Pedro Cardoso
 #####Maintainer: pedro.cardoso@helsinki.fi
 #####Reference: Cardoso, P.(2017) An R package to facilitate species red list assessments according to the IUCN criteria. Biodiversity Data Journal 5: e20530 doi: 10.3897/BDJ.5.e20530
-#####Changed from v1.3.3:
-#####added function raster.distance()
+#####Changed from v1.4.0:
+#####added function rli.predict to interpolate and extrapolate linearly beyond the years assessed
+#####added new options in functions rli and rli.multi on how to deal with DD species when bootstrapping
 
 #####required packages
 library("BAT")
 library("dismo")
+library("gdistance")
 library("geosphere")
 library("graphics")
 library("grDevices")
@@ -21,6 +23,7 @@ library("rgeos")
 library("sp")
 library("stats")
 library("utils")
+#' @import gdistance
 #' @import graphics
 #' @import jsonlite
 #' @import maptools
@@ -29,17 +32,18 @@ library("utils")
 #' @import sp
 #' @import stats
 #' @import utils
+#' @importFrom BAT contribution
 #' @importFrom geosphere areaPolygon
 #' @importFrom grDevices chull dev.copy dev.off pdf
 #' @importFrom methods slot
 #' @importFrom raster area cellStats clump crop extent extract getValues layerStats mask raster rasterize rasterToPoints rasterToPolygons reclassify res sampleRandom scalebar terrain trim writeRaster xmax xmin
 
+raster::rasterOptions(maxmemory = 2e+09)
+globalVariables(c("worldborders"))
+
 ###############################################################################
 ##############################AUX FUNCTIONS####################################
 ###############################################################################
-
-raster::rasterOptions(maxmemory = 2e+09)
-globalVariables(c("worldborders"))
 
 longlat2utm <- function(longlat){
   longlat = as.matrix(longlat)
@@ -77,45 +81,43 @@ find.categorical <- function(layers){
   categorical = c()
   for(l in 1:(dim(layers)[3])){
     lay <- raster::as.matrix(layers[[l]])
-    lay[is.na(lay)] <- 0
-    if(sum(floor(lay)) == sum(lay) && max(lay) < 50)
+    lay <- as.vector(lay)
+    lay <- lay[!is.na(lay)]
+    if(sum(floor(lay)) == sum(lay) && length(unique(lay)) < 50)
       categorical = c(categorical, l)
   }
   return(categorical)
 }
 
 ##basic function to calculate the rli of any group of species
-rli.calc <- function(spData, tree = NULL, boot = FALSE, runs = 1000){
+rli.calc <- function(spData, tree = NULL, boot = FALSE, dd = FALSE, runs = 1000){
   if(all(is.na(spData)))
     return(NA)
-  if(max(spData, na.rm = TRUE) > 5){                                ##if letters are given, convert to [0,1]
-    spData <- replace(spData, which(spData == "EX" ), 0)
-    spData <- replace(spData, which(spData == "EW" ), 0)
-    spData <- replace(spData, which(spData == "RE" ), 0)
-    spData <- replace(spData, which(spData == "CR" ), 0.2)
-    spData <- replace(spData, which(spData == "EN" ), 0.4)
-    spData <- replace(spData, which(spData == "VU" ), 0.6)
-    spData <- replace(spData, which(spData == "NT" ), 0.8)
-    spData <- replace(spData, which(spData == "LC" ), 1)
-    spData <- replace(spData, which(spData == "DD" ), NA)
-    spData <- as.numeric(spData)
-  } else if (all(spData == floor(spData))){  #if all integers, a scale [0,5] is given, convert to [0,1]
-    spData <- 1 - spData/5
-  }
+  spData <- rli.convert(spData)                ##call function to convert spData to a 0-1 scale
+
   if(is.null(tree)){                           ##if not weighted by PD or FD
     if(!boot){                                 ##if no bootstrap to be made
       return (mean(spData, na.rm = TRUE))
     } else {
       run <- rep(NA, runs)
-      for(i in 1:runs){
-        rnd <- sample(spData, replace = TRUE) ##bootstrap
-        run[i] <- mean(rnd, na.rm = TRUE)
+      if(!dd){
+        for(i in 1:runs){
+          rnd <- sample(spData, replace = TRUE) ##bootstrap with all species
+          run[i] <- mean(rnd, na.rm = TRUE)
+        }
+      } else {                                       ##bootstrap with only DD species
+        nDD = sum(is.na(spData))                     ##number of DD species
+        rliBase = sum(spData, na.rm = TRUE)
+        for(i in 1:runs){
+          rnd <- sample(spData[!is.na(spData)], nDD, replace = TRUE)
+          run[i] <- (rliBase + sum(rnd)) / length(spData)
+        }
       }
       res <- matrix(quantile(run, c(0.025, 0.5, 0.975)), nrow = 1)
       colnames(res) <- c("LowCL", "Median", "UpCL")
       return(res)
     }
-  } else {                                     ##if weighted by PD or FD
+  } else {                                     ##if weighted by PD or FD, still to work, not available at the moment!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     comm <- matrix(1, nrow = 2, ncol = length(spData))
     contrib <- BAT::contribution(comm, tree, relative = TRUE)[1,]
     contrib <- contrib/sum(contrib[!is.na(spData)]) #needed to standardize the contribution by the total contribution of species living in the community
@@ -134,6 +136,26 @@ rli.calc <- function(spData, tree = NULL, boot = FALSE, runs = 1000){
         return(res)
     }
   }
+}
+
+##function to convert strings to numbers in the RLI
+rli.convert <- function(spData){
+  if(!is.numeric(spData)){                                ##if letters are given, convert to [0,1]
+    spData <- replace(spData, which(spData == "EX" ), 0)
+    spData <- replace(spData, which(spData == "EW" ), 0)
+    spData <- replace(spData, which(spData == "RE" ), 0)
+    spData <- replace(spData, which(spData == "CR" ), 0.2)
+    spData <- replace(spData, which(spData == "CR(PE)" ), 0.2)
+    spData <- replace(spData, which(spData == "EN" ), 0.4)
+    spData <- replace(spData, which(spData == "VU" ), 0.6)
+    spData <- replace(spData, which(spData == "NT" ), 0.8)
+    spData <- replace(spData, which(spData == "LC" ), 1)
+    spData <- replace(spData, which(spData == "DD" ), NA)
+    spData <- as.numeric(spData)
+  } else if (all(spData == floor(spData))){  #if all integers, a scale [0,5] is given, convert to [0,1]
+    spData <- 1 - spData/5
+  }
+  return(spData)
 }
 
 ##################################################################################
@@ -578,20 +600,22 @@ raster.reduce <- function(layers, method = "pca", n = NULL, thres = NULL){
 }
 
 #' Create distance layer.
-#' @description Create a layer depicting minimum, average or maximum distance to records.
+#' @description Creates a layer depicting distances to records using the minimum, average, distance to the minimum convex polygon or distance taking into account a cost surface.
 #' @param longlat Matrix of longitude and latitude or eastness and northness (two columns in this order) of species occurrence records.
-#' @param layers Raster* object as defined by package raster to serve as model to create distance layer.
-#' @param type text string indicating whether the output should be the "minimum", "average" or "mcp" distance to all records. "mcp" means the distance to the minimum convex polygon encompassing all records.
+#' @param layers Raster* object as defined by package raster to serve as model to create distance layer. Cost surface in case of param ="cost".
+#' @param type text string indicating whether the output should be the "minimum", "average", "mcp" or "cost" distance to all records. "mcp" means the distance to the minimum convex polygon encompassing all records.
 #' @details Using distance to records in models may help limiting the extrapolation of the predicted area much beyond known areas.
 #' @return A RasterLayer object.
 #' @examples data(red.layers)
+#' alt = red.layers[[3]]
 #' data(red.records)
-#' par(mfrow=c(2,2))
-#' raster::plot(red.layers[[1]])
+#' par(mfrow=c(3,2))
+#' raster::plot(alt)
 #' points(red.records)
-#' raster::plot(raster.distance(red.records, red.layers))
-#' raster::plot(raster.distance(red.records, red.layers, type = "average"))
-#' raster::plot(raster.distance(red.records, red.layers, type = "mcp"))
+#' raster::plot(raster.distance(red.records, alt))
+#' raster::plot(raster.distance(red.records, alt, type = "average"))
+#' raster::plot(raster.distance(red.records, alt, type = "mcp"))
+#' raster::plot(raster.distance(red.records, alt, type = "cost"))
 #' @export
 raster.distance <- function(longlat, layers, type = "minimum"){
   if(dim(layers)[3] > 1)
@@ -613,6 +637,11 @@ raster.distance <- function(longlat, layers, type = "minimum"){
     longlat = rasterToPoints(rasterize(poly, layers))[,1:2]
     layers <- mask(raster::distanceFromPoints(layers, longlat), layers)
     names(layers) <- "mcp distance"
+  } else if (type == "cost"){
+    layers <- transition(layers, function(x) 1/mean(x), 8)
+    layers <- geoCorrection(layers)
+    layers <- accCost(layers, as.matrix(longlat))
+    names(layers) <- "cost distance"
   } else {
     layers <- mask(raster::distanceFromPoints(layers, longlat), layers)
     names(layers) <- "minimum distance"
@@ -1428,6 +1457,7 @@ kml <- function(spData, zone = NULL, filename, mapoption = "aoo", smooth = 0, ra
 #' @param spData Either a vector with species assessment categories for a single point in time or a matrix with two points in time in different columns (species x date). Values can be text (EX, EW, RE, CR, EN, VU, NT, DD, LC) or numeric (0 for LC, 1 for NT, 2 for VU, 3 for EN, 4 for CR, 5 for RE/EW/EX).
 #' @param tree An hclust or phylo object (used when species are weighted by their unique contribution to phylogenetic or functional diversity).
 #' @param boot If TRUE bootstrapping for statistical significance is performed on both values per date and the trend between dates.
+#' @param dd bootstrap among all species (FALSE) or Data Deficient species only (TRUE).
 #' @param runs Number of runs for bootstrapping
 #' @details The IUCN Red List Index (RLI) (Butchart et al. 2004, 2007) reflects overall changes in IUCN Red List status over time of a group of taxa.
 #' The RLI uses weight scores based on the Red List status of each of the assessed species. These scores range from 0 (Least Concern) to Extinct/Extinct in the Wild (5).
@@ -1441,33 +1471,33 @@ kml <- function(spData, zone = NULL, filename, mapoption = "aoo", smooth = 0, ra
 #' @references Butchart, S.H.M., Akcakaya, H.R., Chanson, J., Baillie, J.E.M., Collen, B., Quader, S., Turner, W.R., Amin, R., Stuart, S.N. & Hilton-Taylor, C. (2007) Improvements to the Red List index. PloS One, 2: e140.
 #' @references Juslen, A., Cardoso, P., Kullberg, J., Saari, S. & Kaila, L. (2016a) Trends of extinction risk for Lepidoptera in Finland: the first national Red List Index of butterflies and moths. Insect Conservation and Diversity, 9: 118-123.
 #' @references Juslen, A., Pykala, J., Kuusela, S., Kaila, L., Kullberg, J., Mattila, J., Muona, J., Saari, S. & Cardoso, P. (2016b) Application of the Red List Index as an indicator of habitat change. Biodiversity and Conservation, 25: 569-585.
-#' @examples rliData <- matrix(c("LC","LC","EN","EN","EX","EX","LC","CR","CR","EX"), ncol = 2, byrow = TRUE)
+#' @examples rliData <- matrix(c("LC","LC","EN","EN","EX","EX","LC","CR","DD","DD"), ncol = 2, byrow = TRUE)
 #' colnames(rliData) <- c("2000", "2010")
 #' rli(rliData[,1])
 #' rli(rliData[,1], boot = TRUE)
 #' rli(rliData)
-#' rli(rliData, boot = TRUE)
+#' rli(rliData, boot = TRUE, dd = TRUE)
 #' @export
-rli <- function (spData, tree = NULL, boot = FALSE, runs = 1000){
+rli <- function (spData, tree = NULL, boot = FALSE, dd = FALSE, runs = 1000){
 
   ##if only one point in time is given
   if(is.null(dim(spData)))
-    return(rli.calc(spData, tree, boot, runs))  ##return either 1 or 3 values
+    return(rli.calc(spData, tree, boot, dd, runs))  ##return either 1 or 3 values
 
   ##if two points in time are given
   ts <- apply(spData, 2, function(x) rli.calc(x, tree, boot = FALSE))
-  sl <- ts[2] - ts[1]
+  sl <- (ts[2] - ts[1]) / (as.numeric(colnames(spData))[2] - as.numeric(colnames(spData))[1])
   if(!boot){
     res <- matrix(c(ts, sl), nrow = 1)
-    colnames(res) <- c(colnames(spData), "Change")
+    colnames(res) <- c(colnames(spData), "Change/year")
     rownames(res) <- c("Raw")
     return(res)
   } else {
-    tr <- apply(spData, 2, function(x) rli.calc(x, tree, boot, runs))
+    tr <- apply(spData, 2, function(x) rli.calc(x, tree, boot, dd, runs))
     p = 0
     rndSl = rep(NA, runs)
     for(r in 1:runs){
-      rndSl[r] <- rli.calc(spData[,2], tree, boot, 1)[2] - rli.calc(spData[,1], tree, boot, 1)[2]
+      rndSl[r] <- rli.calc(spData[,2], tree, boot, dd, runs = 1)[2] - rli.calc(spData[,1], tree, boot, dd, runs = 1)[2]
       if(sign(sl) < sign(rndSl[r]) || sign(sl) > sign(rndSl[r]))
         p = p + 1
     }
@@ -1485,6 +1515,7 @@ rli <- function (spData, tree = NULL, boot = FALSE, runs = 1000){
 #' @param spData A matrix with group names (first column) and species assessment categories for one or two points in time (remaining columns). Values can be text (EX, EW, RE, CR, EN, VU, NT, DD, LC) or numeric (0 for LC, 1 for NT, 2 for VU, 3 for EN, 4 for CR, 5 for RE/EW/EX).
 #' @param tree A list of hclust or phylo objects, each corresponding to a tree per group (used when species are weighted by their unique contribution to phylogenetic or functional diversity).
 #' @param boot If TRUE bootstrapping for statistical significance is performed on both values per date and the trend between dates.
+#' @param dd bootstrap among all species (FALSE) or Data Deficient species only (TRUE).
 #' @param runs Number of runs for bootstrapping
 #' @details The IUCN Red List Index (RLI) (Butchart et al. 2004, 2007) reflects overall changes in IUCN Red List status over time of a group of taxa.
 #' The RLI uses weight scores based on the Red List status of each of the assessed species. These scores range from 0 (Least Concern) to 5 (Extinct/Extinct in the Wild).
@@ -1506,7 +1537,7 @@ rli <- function (spData, tree = NULL, boot = FALSE, runs = 1000){
 #' rli.multi(rliData)
 #' rli.multi(rliData, boot = TRUE)
 #' @export
-rli.multi <- function (spData, tree = NULL, boot = FALSE, runs = 1000){
+rli.multi <- function (spData, tree = NULL, boot = FALSE, dd = FALSE, runs = 1000){
 
   groups <- unique(spData[,1])
   nGroups <- length(groups)
@@ -1521,9 +1552,9 @@ rli.multi <- function (spData, tree = NULL, boot = FALSE, runs = 1000){
   row.names(res) <- groups
   for(g in 1:nGroups){
     if(is.null(tree))
-      v <- rli(spData[spData[,1] == groups[g],-1], tree = NULL, boot = boot, runs = runs)
+      v <- rli(spData[spData[,1] == groups[g],-1], tree = NULL, boot = boot, dd = dd, runs = runs)
     else
-      v <- rli(spData[spData[,1] == groups[g],-1], tree[[g]], boot = boot, runs = runs)
+      v <- rli(spData[spData[,1] == groups[g],-1], tree[[g]], boot = boot, dd = dd, runs = runs)
     if(ncol(res) < 13){
       res[g,] <- v
       colnames(res) <- colnames(v)
@@ -1534,6 +1565,40 @@ rli.multi <- function (spData, tree = NULL, boot = FALSE, runs = 1000){
       res[g,13] <- v$P_change
     }
   }
+  return(res)
+}
+
+#' Prediction of Red List Index.
+#' @description Linearly interpolates and extrapolates RLI values to any years.
+#' @param rliValue Should be a vector with RLI values and names as the corresponding year numbers.
+#' @param from Starting year of the sequence to predict.
+#' @param to Ending year of the sequence to predict.
+#' @param rliPlot Plots the result
+#' @details The IUCN Red List Index (RLI) (Butchart et al. 2004, 2007) reflects overall changes in IUCN Red List status over time of a group of taxa.
+#' @return A matrix with the RLI values and confidence limits.
+#' @examples rliValue <- c(4.5, 4.3, 4.4, 4.2, 4.0)
+#' names(rliValue) <- c(2000, 2004, 2008, 2011, 2017)
+#' rli.predict(rliValue, 1990, 2020)
+#' @export
+rli.predict <- function(rliValue, from = NA, to = NA, rliPlot = FALSE){
+  year = as.numeric(c(names(rliValue)))
+  rliTable = data.frame(rliValue, year)
+  if(is.na(from))
+    from = min(year)
+  if(is.na(to))
+    to = max(year)
+  newYear = data.frame(year = seq(from = from, to = to, by = 1))
+  lmOut = predict(lm(rliValue ~ year, data = rliTable), newYear, interval = "confidence", level = 0.95)
+  res = lmOut[,c(2,1,3)]
+  colnames(res) = c("LowCL", "Fitted RLI", "UpCL")
+  rownames(res) = newYear$year
+  
+  if(rliPlot){
+    plot(year, rliValue, xlab="Year", ylab="Fitted RLI", xlim = c(from, to), ylim = c(0,5))
+    abline(lm(rliValue ~ year, data = rliTable), col = "red")
+    matlines(newYear, lmOut[,2:3], col = "blue", lty = 2)
+  }
+  
   return(res)
 }
 
@@ -1565,7 +1630,7 @@ rli.sampled <- function (spData, tree = NULL, p = 0.05, runs = 1000){
       rndComm = rep(NA, nSpp)
       rndSpp = sample(nSpp, n)
       rndComm[rndSpp] = spData[rndSpp]
-      diff[r] = abs(rli.calc(spData, tree, FALSE, 1) - rli.calc(rndComm, tree, FALSE, 1))  #calculate absolute difference between true and sampled rli for each run
+      diff[r] = abs(rli.calc(spData, tree, FALSE, FALSE, runs = 1) - rli.calc(rndComm, tree, FALSE, FALSE, runs = 1))  #calculate absolute difference between true and sampled rli for each run
     }
     accum[n] = quantile(diff, (1-p))
   }

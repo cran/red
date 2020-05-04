@@ -4,9 +4,21 @@
 \alias{map.sdm}
 \title{Predict species distribution.}
 \usage{
-map.sdm(longlat, layers, error = NULL, year = NULL, idconf = NULL,
-  categorical = NULL, thres = 0, testpercentage = 0, mcp = TRUE,
-  points = FALSE, eval = TRUE, runs = 0, subset = 0)
+map.sdm(
+  longlat,
+  layers,
+  error = NULL,
+  year = NULL,
+  idconf = NULL,
+  categorical = NULL,
+  thres = 0,
+  testpercentage = 0,
+  mcp = TRUE,
+  points = FALSE,
+  eval = TRUE,
+  runs = 0,
+  subset = 0
+)
 }
 \arguments{
 \item{longlat}{Matrix of longitude and latitude or eastness and northness (two columns in this order) of each occurrence record.}

@@ -4,7 +4,7 @@
 \alias{rli.multi}
 \title{Red List Index for multiple groups.}
 \usage{
-rli.multi(spData, tree = NULL, boot = FALSE, runs = 1000)
+rli.multi(spData, tree = NULL, boot = FALSE, dd = FALSE, runs = 1000)
 }
 \arguments{
 \item{spData}{A matrix with group names (first column) and species assessment categories for one or two points in time (remaining columns). Values can be text (EX, EW, RE, CR, EN, VU, NT, DD, LC) or numeric (0 for LC, 1 for NT, 2 for VU, 3 for EN, 4 for CR, 5 for RE/EW/EX).}
@@ -12,6 +12,8 @@ rli.multi(spData, tree = NULL, boot = FALSE, runs = 1000)
 \item{tree}{A list of hclust or phylo objects, each corresponding to a tree per group (used when species are weighted by their unique contribution to phylogenetic or functional diversity).}
 
 \item{boot}{If TRUE bootstrapping for statistical significance is performed on both values per date and the trend between dates.}
+
+\item{dd}{bootstrap among all species (FALSE) or Data Deficient species only (TRUE).}
 
 \item{runs}{Number of runs for bootstrapping}
 }

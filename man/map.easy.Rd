@@ -4,10 +4,24 @@
 \alias{map.easy}
 \title{Species distributions made easy (multiple species).}
 \usage{
-map.easy(longlat, layers = NULL, habitat = NULL, zone = NULL,
-  thin = TRUE, error = NULL, move = TRUE, dem = NULL, pca = 0,
-  filename = NULL, mapoption = NULL, testpercentage = 0, mintest = 20,
-  points = FALSE, runs = 0, subset = 0)
+map.easy(
+  longlat,
+  layers = NULL,
+  habitat = NULL,
+  zone = NULL,
+  thin = TRUE,
+  error = NULL,
+  move = TRUE,
+  dem = NULL,
+  pca = 0,
+  filename = NULL,
+  mapoption = NULL,
+  testpercentage = 0,
+  mintest = 20,
+  points = FALSE,
+  runs = 0,
+  subset = 0
+)
 }
 \arguments{
 \item{longlat}{data.frame of taxon names, longitude and latitude or eastness and northness (three columns in this order) of each occurrence record.}
