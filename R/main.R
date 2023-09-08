@@ -1,10 +1,10 @@
 #####RED - IUCN Redlisting Tools
-#####Version 1.6.0 (2023-08-01)
+#####Version 1.6.1 (2023-08-01)
 #####By Pedro Cardoso & Vasco Branco
 #####Maintainer: vasco.branco@helsinki.fi
 #####Reference: Cardoso, P.(2017) An R package to facilitate species red list assessments according to the IUCN criteria. Biodiversity Data Journal 5: e20530 doi: 10.3897/BDJ.5.e20530
-#####Changed from v1.5.0:
-#####replaced all functions from deprecated packages to terra
+#####Changed from v1.6.0:
+#####rgeos import fix, terra update fixes
 
 ################################################################################
 ##################################MAIN FUNCTIONS################################
@@ -77,7 +77,6 @@ move <- function(longlat, layers, buffer = 0) {
         )
       )
       distRaster <- terra::mask(distRaster, layers)
-      # vmin = distRaster@ptr$range_min
       vmin <- terra::where.min(distRaster)
 
       if (buffer <= 0 || buffer > vmin) {
@@ -633,8 +632,8 @@ aoo <- function(spData){
         } else {
           spData[spData < 1] <- NA
           spData <- terra::as.points(spData)
-          spData <- data.frame(x = spData@ptr$coordinates()[[1]],
-                               y = spData@ptr$coordinates()[[2]])
+          spData <- data.frame(x = terra::crds(spData)[,1],
+                               y = terra::crds(spData)[,2])
 
           if(nrow(unique(spData)) == 1){
             area = 4
@@ -648,8 +647,8 @@ aoo <- function(spData){
       } else { #if square data in meters
         spData[spData < 1] <- NA
         spData <- terra::as.points(spData) # rasterToPoints(spData)
-        spData <- data.frame(x = spData@ptr$coordinates()[[1]],
-                             y = spData@ptr$coordinates()[[2]])
+        spData <- data.frame(x = terra::crds(spData)[,1],
+                             y = terra::crds(spData)[,2])
         spData = floor(spData/2000)
         ncells = nrow(unique(spData))
         area = ncells * 4

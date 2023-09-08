@@ -8,7 +8,6 @@ library("grDevices")
 library("jsonlite")
 library("methods")
 library("predicts")
-library("rgeos")
 library("sp")
 library("stats")
 library("terra")
@@ -16,7 +15,6 @@ library("utils")
 #' @import gdistance
 #' @import graphics
 #' @import jsonlite
-#' @import rgeos
 #' @import sp
 #' @import stats
 #' @import utils

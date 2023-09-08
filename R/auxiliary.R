@@ -1,11 +1,3 @@
-#####RED - IUCN Redlisting Tools
-#####Version 1.6.0 (2023-08-01)
-#####By Pedro Cardoso & Vasco Branco
-#####Maintainer: vasco.branco@helsinki.fi
-#####Reference: Cardoso, P.(2017) An R package to facilitate species red list assessments according to the IUCN criteria. Biodiversity Data Journal 5: e20530 doi: 10.3897/BDJ.5.e20530
-#####Changed from v1.5.0:
-#####replaced all functions from deprecated packages to terra
-
 ###############################################################################
 ##############################AUX FUNCTIONS####################################
 ###############################################################################
@@ -28,7 +20,7 @@ longlat2utm <- function(longlat){
     minlong = terra::xmin(longlat)
     zone = floor((minlong + 180) / 6) + 1
     res <- terra::project(longlat, paste0("+proj=utm +zone=", zone," ellps=WGS84"))
-    res <- data.frame(x = res@ptr$coordinates()[[1]], y = res@ptr$coordinates()[[2]])
+    res <- data.frame(x = terra::crds(res)[,1], y = terra::crds(res)[,2])
     return(res)
   }
   
@@ -37,8 +29,8 @@ longlat2utm <- function(longlat){
   zone = floor((minlong + 180) / 6) + 1
   res = terra::project(longlat, paste0("+proj=utm +zone=", zone," ellps=WGS84"))
   
-  res <- data.frame(x = res@ptr$coordinates()[[1]],
-                    y = res@ptr$coordinates()[[2]])
+  res <- data.frame(x = terra::crds(res)[,1],
+                    y = terra::crds(res)[,2])
   return(res)
 }
 
