@@ -19,6 +19,8 @@ Downloads species or higher taxon data from GBIF and outputs non-duplicate recor
 As always when using data from multiple sources the user should be careful and check if records "make sense". This can be done by either ploting them in a map (e.g. using red::map.draw()) or using red::outliers().
 }
 \examples{
+\dontrun{
 rec = records("Nephila senegalensis")
 plot(rec)
+}
 }

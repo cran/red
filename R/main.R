@@ -16,12 +16,38 @@
 #' @details As always when using data from multiple sources the user should be careful and check if records "make sense". This can be done by either ploting them in a map (e.g. using red::map.draw()) or using red::outliers().
 #' @return A data.frame with longitude and latitude, plus species names if taxon is above species.
 #' @examples
+#' \dontrun{
 #' rec = records("Nephila senegalensis")
 #' plot(rec)
+#' }
 #' @export
 records <- function(taxon){
   taxon = unlist(strsplit(taxon, split = " ")[[1]])
-  dat <- dismo::gbif(taxon[1], paste(taxon[2], "*", sep = ""))
+  # In the future a function will be implemented to ping the GBIF API to check if it is available
+  
+  if (dat == 0){
+    dat = tryCatch(
+      {
+        suppressWarnings(dismo::gbif(taxon[1], paste(taxon[2], "*", sep = "")))
+      },
+      error = function(e){
+        dat = 0
+      }
+    )
+  }
+  
+  if (dat != 0){
+    message(
+      paste0(
+        "Extraction of records was unsuccessful. This could be due to a variety",
+        " of issues including a poor internet connection or the GBIF API being",
+        " unavailable at the moment, please try again later. If the problem",
+        " persists please contact us at: https://github.com/VascoBranco/red/issues"
+      )
+    )
+    return(NULL) 
+  }
+  
   dat <- dat[c("species","lon","lat")] #filter columns
   dat <- dat[!(is.na(dat$lon) | is.na(dat$lat)),] #filter rows
   dat <- unique(dat)       #delete duplicate rows
